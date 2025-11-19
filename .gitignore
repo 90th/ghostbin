@@ -27,3 +27,8 @@ dist-ssr
 # Rust backend
 
 backend/target
+
+
+# Tor
+
+tor/

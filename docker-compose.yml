@@ -31,14 +31,10 @@ services:
     # No ports exposed to host for security
 
   tor:
-    image: goldy/tor-hidden-service
+    build:
+      context: ./tor
     restart: always
-    environment:
-      # Map the service to the frontend container
-      - GHOSTBIN_SERVICE_HOST=frontend
-      - GHOSTBIN_SERVICE_PORT=80
     volumes:
-      - ./tor/torrc:/etc/tor/torrc
       - ./tor/keys:/var/lib/tor/hidden_service/
     depends_on:
       - frontend
