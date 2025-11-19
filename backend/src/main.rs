@@ -25,12 +25,15 @@ async fn main() {
                 .parse::<axum::http::HeaderValue>()
                 .unwrap(),
         )
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers(Any);
 
     let app = Router::new()
         .route("/api/v1/paste", post(handlers::create_paste))
-        .route("/api/v1/paste/:id", get(handlers::get_paste))
+        .route(
+            "/api/v1/paste/:id",
+            get(handlers::get_paste).delete(handlers::delete_paste),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(client);

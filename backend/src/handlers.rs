@@ -74,8 +74,8 @@ pub async fn get_paste(
     let mut paste: Paste =
         serde_json::from_str(&json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    if paste.burn_after_read {
-        // Delete immediately
+    if paste.burn_after_read && !paste.has_password {
+        // Delete immediately ONLY if it's not password protected
         let _: () = con
             .del(&key)
             .await
@@ -103,4 +103,23 @@ pub async fn get_paste(
     }
 
     Ok(Json(paste))
+}
+
+pub async fn delete_paste(
+    State(client): State<Client>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, StatusCode> {
+    let mut con = client
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let key = format!("paste:{}", id);
+
+    let _: () = con
+        .del(&key)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(StatusCode::NO_CONTENT)
 }

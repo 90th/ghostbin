@@ -125,3 +125,38 @@ export const decryptText = async (encryptedData: string, ivStr: string, key: Cry
   const decoder = new TextDecoder();
   return decoder.decode(decryptedBuffer);
 };
+
+// Helper for URL-safe Base64
+const toUrlSafeBase64 = (base64: string): string => {
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+
+const fromUrlSafeBase64 = (base64: string): string => {
+  let str = base64.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) {
+    str += '=';
+  }
+  return str;
+};
+
+// Export key to Raw Base64 (URL-safe)
+export const exportKeyRaw = async (key: CryptoKey): Promise<string> => {
+  const exported = await window.crypto.subtle.exportKey("raw", key);
+  const base64 = arrayBufferToBase64(exported);
+  return toUrlSafeBase64(base64);
+};
+
+// Import key from Raw Base64 string (URL-safe)
+export const importKeyRaw = async (base64Key: string): Promise<CryptoKey> => {
+  const base64 = fromUrlSafeBase64(base64Key);
+  const buffer = base64ToArrayBuffer(base64);
+  return window.crypto.subtle.importKey(
+    "raw",
+    buffer,
+    {
+      name: "AES-GCM",
+    },
+    true,
+    ["encrypt", "decrypt"]
+  );
+};

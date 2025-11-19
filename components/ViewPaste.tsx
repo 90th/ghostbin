@@ -81,7 +81,7 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
         const decryptedKeyJson = await CryptoService.decryptText(data.encryptedKey, data.keyIv, wrapperKey);
         contentKey = await CryptoService.importKey(decryptedKeyJson);
       } else {
-        contentKey = await CryptoService.importKey(keyString);
+        contentKey = await CryptoService.importKeyRaw(keyString);
       }
 
       const text = await CryptoService.decryptText(data.data, data.iv, contentKey);
@@ -96,6 +96,11 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
         language: data.language
       });
       setStatus('success');
+
+      // If Burn After Read AND Password Protected, delete now that we have successfully decrypted
+      if (data.burnAfterRead && data.hasPassword) {
+        StorageService.deletePaste(data.id).catch(console.error);
+      }
 
     } catch (err: any) {
       if (isPasswordDerived) {

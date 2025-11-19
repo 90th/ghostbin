@@ -6,6 +6,7 @@ import { ViewPaste } from './components/ViewPaste';
 const App: React.FC = () => {
   const [route, setRoute] = useState<'create' | 'view'>('create');
   const [viewParams, setViewParams] = useState<{ id: string; key: string | null } | null>(null);
+  const [createKey, setCreateKey] = useState(0);
 
   // Safe hash parsing that won't crash if location is restricted
   const parseHash = useCallback(() => {
@@ -31,7 +32,7 @@ const App: React.FC = () => {
     };
 
     window.addEventListener('hashchange', handleHashChange);
-    
+
     // Initial sync
     handleHashChange();
 
@@ -42,13 +43,14 @@ const App: React.FC = () => {
     if (dest === 'create') {
       setRoute('create');
       setViewParams(null);
+      setCreateKey(prev => prev + 1);
       // Attempt to clear URL hash, but gracefully fail if blocked by sandbox
       try {
         if (window.location.hash !== '') {
-            window.location.hash = '';
+          window.location.hash = '';
         }
-      } catch (e) { 
-        console.warn('Navigation hash update blocked:', e); 
+      } catch (e) {
+        console.warn('Navigation hash update blocked:', e);
       }
     }
   }, []);
@@ -57,15 +59,15 @@ const App: React.FC = () => {
     <Layout onNavigate={handleNavigate}>
       {route === 'create' && (
         <div className="max-w-4xl mx-auto">
-          <CreatePaste />
+          <CreatePaste key={createKey} />
         </div>
       )}
-      
+
       {route === 'view' && viewParams && (
         <div className="max-w-5xl mx-auto">
-          <ViewPaste 
-            pasteId={viewParams.id} 
-            decryptionKey={viewParams.key} 
+          <ViewPaste
+            pasteId={viewParams.id}
+            decryptionKey={viewParams.key}
             onBack={() => handleNavigate('create')}
           />
         </div>

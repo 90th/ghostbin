@@ -63,6 +63,8 @@ export const CreatePaste: React.FC = () => {
   const [expiration, setExpiration] = useState<number>(24 * 60 * 60 * 1000); // Default 1 Day
   const [language, setLanguage] = useState<string>('plaintext');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const preRef = useRef<HTMLPreElement>(null);
 
@@ -70,6 +72,7 @@ export const CreatePaste: React.FC = () => {
     if (!content.trim()) return;
 
     setIsProcessing(true);
+    setError(null);
     try {
       // 1. Generate Content Key
       const contentKey = await CryptoService.generateKey();
@@ -108,8 +111,8 @@ export const CreatePaste: React.FC = () => {
         payload.keyIv = keyIv;
         keyParam = '';
       } else {
-        const keyString = await CryptoService.exportKey(contentKey);
-        keyParam = `&key=${encodeURIComponent(keyString)}`;
+        const keyString = await CryptoService.exportKeyRaw(contentKey);
+        keyParam = `&key=${keyString}`;
       }
 
       await StorageService.savePaste(payload);
@@ -131,7 +134,7 @@ export const CreatePaste: React.FC = () => {
 
     } catch (error) {
       console.error("Encryption failed:", error);
-      alert("Failed to encrypt data.");
+      setError("Failed to encrypt data. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -140,7 +143,8 @@ export const CreatePaste: React.FC = () => {
   const copyToClipboard = () => {
     if (shareUrl) {
       navigator.clipboard.writeText(shareUrl);
-      alert("Copied to clipboard!");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -200,11 +204,15 @@ export const CreatePaste: React.FC = () => {
         </div>
 
         <div className="flex gap-3 justify-center">
-          <Button onClick={copyToClipboard} icon={<Copy className="w-4 h-4" />}>
-            Copy
+          <Button
+            onClick={copyToClipboard}
+            icon={copied ? undefined : <Copy className="w-4 h-4" />}
+            variant={copied ? "secondary" : "primary"}
+          >
+            {copied ? "Copied!" : "Copy Link"}
           </Button>
           <Button variant="secondary" onClick={handleReset} icon={<ExternalLink className="w-4 h-4" />}>
-            New
+            New Paste
           </Button>
         </div>
       </div>
@@ -265,7 +273,13 @@ export const CreatePaste: React.FC = () => {
       </div>
 
       {/* Compact Control Bar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 bg-bg-surface p-2 rounded-lg border border-white/5">
+      <div className="relative flex flex-col md:flex-row items-stretch md:items-center gap-3 bg-bg-surface p-2 rounded-lg border border-white/5">
+
+        {error && (
+          <div className="absolute bottom-full mb-2 left-0 right-0 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-2 rounded text-sm text-center">
+            {error}
+          </div>
+        )}
 
         {/* Password Input */}
         <div className="relative flex-grow group min-w-[200px]">

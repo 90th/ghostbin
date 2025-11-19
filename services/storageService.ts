@@ -25,3 +25,13 @@ export const getPaste = async (id: string): Promise<EncryptedPaste | null> => {
 
   return response.json();
 };
+
+export const deletePaste = async (id: string): Promise<void> => {
+  const response = await fetch(`${API_BASE}/paste/${id}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    console.error(`Failed to delete paste ${id}: ${response.status}`);
+  }
+};
