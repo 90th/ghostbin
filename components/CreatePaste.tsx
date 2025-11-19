@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { Lock, Flame, Code, Copy, ExternalLink, KeyRound, ChevronRight, Clock } from 'lucide-react';
 import { Button } from './Button';
 import * as CryptoService from '../services/cryptoService';
@@ -53,6 +53,7 @@ const EDITOR_STYLES: React.CSSProperties = {
   whiteSpace: 'pre',
   overflowWrap: 'normal',
   wordBreak: 'normal',
+  fontVariantLigatures: 'none',
 };
 
 export const CreatePaste: React.FC = () => {
@@ -65,8 +66,15 @@ export const CreatePaste: React.FC = () => {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fontsLoaded, setFontsLoaded] = useState(false);
 
   const preRef = useRef<HTMLPreElement>(null);
+
+  useLayoutEffect(() => {
+    document.fonts.ready.then(() => {
+      setFontsLoaded(true);
+    });
+  }, []);
 
   const handleEncrypt = async () => {
     if (!content.trim()) return;
@@ -224,11 +232,17 @@ export const CreatePaste: React.FC = () => {
       {/* Editor Area */}
       <div className="relative group flex-grow flex flex-col bg-bg-surface rounded-lg border border-white/5 overflow-hidden transition-colors hover:border-white/10">
 
+        {!fontsLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-bg-surface z-30">
+            <div className="animate-pulse text-gray-600 text-sm font-mono">Loading editor...</div>
+          </div>
+        )}
+
         {/* Syntax Highlighting Layer (Background) */}
         <pre
           ref={preRef}
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full m-0 overflow-hidden pointer-events-none select-none text-left"
+          className={`absolute inset-0 w-full h-full m-0 overflow-hidden pointer-events-none select-none text-left ${!fontsLoaded ? 'opacity-0' : 'opacity-100'}`}
           style={EDITOR_STYLES}
         >
           <code
@@ -257,7 +271,7 @@ export const CreatePaste: React.FC = () => {
           onChange={(e) => setContent(e.target.value)}
           onScroll={handleScroll}
           placeholder="Type your secret message..."
-          className="absolute inset-0 w-full h-full bg-transparent text-transparent caret-white resize-none focus:outline-none placeholder:text-gray-700 z-10 overflow-auto"
+          className={`absolute inset-0 w-full h-full bg-transparent text-transparent caret-white resize-none focus:outline-none placeholder:text-gray-700 z-10 overflow-auto ${!fontsLoaded ? 'opacity-0' : 'opacity-100'}`}
           style={EDITOR_STYLES}
           spellCheck={false}
           wrap="off"
