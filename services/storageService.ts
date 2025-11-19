@@ -1,0 +1,27 @@
+import { EncryptedPaste } from '../types';
+
+const API_BASE = '/api/v1';
+
+export const savePaste = async (paste: EncryptedPaste): Promise<void> => {
+  const response = await fetch(`${API_BASE}/paste`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(paste),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Server error: ${response.status}`);
+  }
+};
+
+export const getPaste = async (id: string): Promise<EncryptedPaste | null> => {
+  const response = await fetch(`${API_BASE}/paste/${id}`);
+
+  if (response.status === 404) return null;
+
+  if (!response.ok) {
+    throw new Error(`Server error: ${response.status}`);
+  }
+
+  return response.json();
+};

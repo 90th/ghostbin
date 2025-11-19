@@ -1,0 +1,50 @@
+services:
+  redis:
+    image: redis:alpine
+    restart: always
+    networks:
+      - ghostbin-net
+    # No ports exposed to host for security
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - redis
+    networks:
+      - ghostbin-net
+    # No ports exposed to host for security
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - ghostbin-net
+    # No ports exposed to host for security
+
+  tor:
+    image: goldy/tor-hidden-service
+    restart: always
+    environment:
+      # Map the service to the frontend container
+      - GHOSTBIN_SERVICE_HOST=frontend
+      - GHOSTBIN_SERVICE_PORT=80
+    volumes:
+      - ./tor/torrc:/etc/tor/torrc
+      - ./tor/keys:/var/lib/tor/hidden_service/
+    depends_on:
+      - frontend
+    networks:
+      - ghostbin-net
+
+networks:
+  ghostbin-net:
+    driver: bridge
