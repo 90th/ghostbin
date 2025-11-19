@@ -36,13 +36,13 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
         {children}
       </main>
 
-      <footer className="border-t border-white/5 py-6 mt-auto">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-gray-600 font-mono">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-3 h-3 text-brand-700" />
+      <footer className="border-t border-white/5 py-2 mt-auto bg-bg-dark/50">
+        <div className="max-w-5xl mx-auto px-4 flex justify-between items-center text-[11px] font-bold text-gray-500 font-mono">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-3 h-3 text-brand-600" />
             <span>AES-256-GCM Encrypted</span>
           </div>
-          <p>© {new Date().getFullYear()} Ghostbin</p>
+          <p className="opacity-70">© {new Date().getFullYear()} Ghostbin</p>
         </div>
       </footer>
     </div>
