@@ -11,7 +11,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
     <div className="min-h-screen bg-bg flex flex-col selection:bg-brand-900 selection:text-white">
       <header className="border-b border-white/5 bg-bg/90 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <button 
+          <button
             onClick={() => onNavigate('create')}
             className="flex items-center gap-3 group focus:outline-none"
           >
@@ -24,7 +24,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
           </button>
 
           <nav className="flex items-center gap-6">
-            <a href="#" onClick={(e) => {e.preventDefault(); onNavigate('create')}} className="text-xs font-mono text-gray-500 hover:text-brand-500 transition-colors uppercase tracking-wider">New Paste</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('create') }} className="text-xs font-mono text-gray-500 hover:text-brand-500 transition-colors uppercase tracking-wider">New Paste</a>
             <a href="https://github.com" target="_blank" rel="noreferrer" className="text-gray-600 hover:text-gray-300">
               <Github className="w-4 h-4" />
             </a>
