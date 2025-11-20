@@ -134,7 +134,7 @@ export const CreatePaste: React.FC = () => {
 
       await StorageService.savePaste(payload);
 
-      let origin = 'https://ghostbin.app';
+      let origin = 'http://localhost';
       try {
         if (window.location.origin && window.location.origin !== 'null') {
           origin = window.location.origin;
