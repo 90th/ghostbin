@@ -12,6 +12,7 @@ if the server restarts, the power cuts, or the process is killed, the data is in
 
 ## features
 - **zero-knowledge:** aes-256-gcm encryption happens in the browser. the server only ever sees ciphertext.
+- **dos protection:** client-side proof-of-work required for uploads. keeps the ram safe from spam floods without tracking ips.
 - **password protection:** optional. keys derived from password using argon2id via wasm.
 - **volatile by design:** no hard drive writes. forensic analysis is impossible once the process dies.
 - **burn after read:** optional setting to nuke the paste immediately after it's viewed once.
@@ -54,8 +55,10 @@ bun dev
 ## api
 minimal endpoints.
 encryption happens client-side, so don't send raw text here.
+uploads require a valid proof-of-work solution in the headers.
 
-- `POST /api/v1/paste` - upload encrypted payload
+- `GET /api/v1/challenge` - request a pow challenge (returns salt + difficulty + signature)
+- `POST /api/v1/paste` - upload encrypted payload. requires `X-PoW-*` headers. returns assigned `{id: "..."}`
 - `GET /api/v1/paste/:id` - fetch encrypted payload
 - `DELETE /api/v1/paste/:id` - delete manually (requires burn token if active)
 
