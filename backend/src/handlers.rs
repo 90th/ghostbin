@@ -225,9 +225,9 @@ pub async fn get_paste(
         serde_json::from_str(&json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if paste.burn_after_read && !paste.has_password {
-        // set panic ttl (10 mins) to ensure deletion if client crashes
+        // set panic ttl (90s) burn burn burn away
         let _: () = con
-            .expire(&key, 600)
+            .expire(&key, 90)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     } else {
