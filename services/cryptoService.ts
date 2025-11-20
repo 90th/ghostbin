@@ -1,5 +1,15 @@
 import { argon2id } from 'hash-wasm';
 
+// SHA-256 Hash function for Burn Token
+export const hashToken = async (token: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
+};
+
 /**
  * Client-side encryption service using Web Crypto API.
  * Nothing leaves the browser unencrypted.

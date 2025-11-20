@@ -7,12 +7,13 @@ export interface EncryptedPaste {
   burnAfterRead: boolean;
   views: number;
   language?: string;
-  
+
   // Password protection fields
   hasPassword?: boolean;
   salt?: string; // Base64 encoded salt for PBKDF2
   encryptedKey?: string; // Base64 encoded ciphertext of the content key
   keyIv?: string; // Base64 encoded IV for the key encryption
+  burnTokenHash?: string; // SHA-256 hash of the burn token
 }
 
 export interface DecryptedPaste {
@@ -23,6 +24,7 @@ export interface DecryptedPaste {
   views: number;
   expiresAt?: number;
   language?: string;
+  burnToken?: string; // The secret token to authorize deletion
 }
 
 export interface PasteMetadata {

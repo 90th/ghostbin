@@ -88,8 +88,20 @@ export const CreatePaste: React.FC = () => {
       // 1. Generate Content Key
       const contentKey = await CryptoService.generateKey();
 
-      // 2. Encrypt Content
-      const { iv: contentIv, data: encryptedContent } = await CryptoService.encryptText(content, contentKey);
+      // 1b. Generate Burn Token if needed
+      let burnToken: string | undefined;
+      let burnTokenHash: string | undefined;
+      if (burnAfterRead) {
+        burnToken = uuidv4();
+        burnTokenHash = await CryptoService.hashToken(burnToken);
+      }
+
+      // 2. Encrypt Content (Pack token inside)
+      const payloadToEncrypt = JSON.stringify({
+        text: content,
+        burnToken
+      });
+      const { iv: contentIv, data: encryptedContent } = await CryptoService.encryptText(payloadToEncrypt, contentKey);
 
       // 3. Calculate Expiration
       const expiresAt = expiration > 0 ? Date.now() + expiration : undefined;
@@ -105,7 +117,8 @@ export const CreatePaste: React.FC = () => {
         burnAfterRead,
         views: 0,
         language,
-        hasPassword: false
+        hasPassword: false,
+        burnTokenHash
       };
 
       let keyParam = '';

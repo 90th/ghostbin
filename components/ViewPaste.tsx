@@ -84,7 +84,21 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
         contentKey = await CryptoService.importKeyRaw(keyString);
       }
 
-      const text = await CryptoService.decryptText(data.data, data.iv, contentKey);
+      const rawDecrypted = await CryptoService.decryptText(data.data, data.iv, contentKey);
+
+      // Parse payload to extract text and potential burn token
+      let text = rawDecrypted;
+      let burnToken: string | undefined;
+
+      try {
+        const payload = JSON.parse(rawDecrypted);
+        if (payload && typeof payload === 'object' && 'text' in payload) {
+          text = payload.text;
+          burnToken = payload.burnToken;
+        }
+      } catch (e) {
+        // Legacy paste or plain text, keep as is
+      }
 
       setDecryptedPaste({
         id: data.id,
@@ -93,13 +107,15 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
         burnAfterRead: data.burnAfterRead,
         views: data.views,
         expiresAt: data.expiresAt,
-        language: data.language
+        language: data.language,
+        burnToken
       });
       setStatus('success');
 
-      // If Burn After Read AND Password Protected, delete now that we have successfully decrypted
-      if (data.burnAfterRead && data.hasPassword) {
-        StorageService.deletePaste(data.id).catch(console.error);
+      // If Burn After Read, delete now that we have successfully decrypted
+      // We pass the burnToken to prove we decrypted it
+      if (data.burnAfterRead) {
+        StorageService.deletePaste(data.id, burnToken).catch(console.error);
       }
 
     } catch (err: any) {

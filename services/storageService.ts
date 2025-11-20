@@ -26,9 +26,15 @@ export const getPaste = async (id: string): Promise<EncryptedPaste | null> => {
   return response.json();
 };
 
-export const deletePaste = async (id: string): Promise<void> => {
+export const deletePaste = async (id: string, burnToken?: string): Promise<void> => {
+  const headers: HeadersInit = {};
+  if (burnToken) {
+    headers['X-Burn-Token'] = burnToken;
+  }
+
   const response = await fetch(`${API_BASE}/paste/${id}`, {
     method: 'DELETE',
+    headers,
   });
 
   if (!response.ok) {
