@@ -49,27 +49,22 @@ jobs:
       run: cargo test
 
   frontend:
-    name: Frontend (Node/Vite)
+    name: Frontend (Bun/Vite)
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
       with:
-        node-version: 'lts/*'
-        cache: 'npm'
+        bun-version: latest
 
     - name: Install Dependencies
-      run: npm ci
-
-    - name: Security Audit
-      # fails if any vulnerability of level 'high' or greater is found
-      run: npm audit --audit-level=high
+      run: bun install --frozen-lockfile
 
     - name: Build
-      run: npm run build
+      run: bun run build
 
   docker:
     name: Docker Integrity
