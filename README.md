@@ -1,4 +1,4 @@
-# <img src="./Ghostbin.png" width="25" alt="logo" style="vertical-align: bottom;" /> ghostbin 
+# <img src="./Ghostbin.png" width="25" alt="logo" style="vertical-align: bottom;" /> ghostbin  [![CI](https://github.com/90th/ghostbin/actions/workflows/ci.yml/badge.svg)](https://github.com/90th/ghostbin/actions/workflows/ci.yml) [![Stars](https://img.shields.io/github/stars/90th/ghostbin?style=social)](https://github.com/90th/ghostbin/stargazers)
 
 a secure, ephemeral, zero-knowledge pastebin.
 client-side encryption. nothing hits the disk. ever.
