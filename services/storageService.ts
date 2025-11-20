@@ -2,10 +2,13 @@ import { EncryptedPaste } from '../types';
 
 const API_BASE = '/api/v1';
 
-export const savePaste = async (paste: EncryptedPaste): Promise<void> => {
+export const savePaste = async (paste: EncryptedPaste, headers?: Record<string, string>): Promise<void> => {
   const response = await fetch(`${API_BASE}/paste`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...headers
+    },
     body: JSON.stringify(paste),
   });
 

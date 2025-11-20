@@ -4,19 +4,136 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
+use hmac::{Hmac, Mac};
+use rand::Rng;
 use redis::{AsyncCommands, Client};
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Clone)]
+pub struct AppState {
+    pub client: Client,
+    pub hmac_secret: [u8; 32],
+}
+
+#[derive(Serialize)]
+pub struct ChallengeResponse {
+    pub salt: String,
+    pub difficulty: usize,
+    pub timestamp: u64,
+    pub signature: String,
+}
+
+const POW_DIFFICULTY: usize = 4;
+
+pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeResponse> {
+    let mut rng = rand::thread_rng();
+    let salt: String = (0..16)
+        .map(|_| format!("{:02x}", rng.gen::<u8>()))
+        .collect();
+
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let difficulty = POW_DIFFICULTY; // Leading zeros required (hex characters)
+
+    // Create signature: HMAC-SHA256(salt + difficulty + timestamp)
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac =
+        HmacSha256::new_from_slice(&state.hmac_secret).expect("HMAC can take key of any size");
+    mac.update(salt.as_bytes());
+    mac.update(difficulty.to_string().as_bytes());
+    mac.update(timestamp.to_string().as_bytes());
+    let result = mac.finalize();
+    let signature = hex::encode(result.into_bytes());
+
+    Json(ChallengeResponse {
+        salt,
+        difficulty,
+        timestamp,
+        signature,
+    })
+}
+
 pub async fn create_paste(
-    State(client): State<Client>,
+    State(state): State<AppState>,
+    headers: HeaderMap,
     Json(paste): Json<Paste>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    // 1. Verify PoW
+    let pow_salt = headers
+        .get("X-PoW-Salt")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let pow_nonce = headers
+        .get("X-PoW-Nonce")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let pow_ts_str = headers
+        .get("X-PoW-Timestamp")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("0");
+    let pow_sig = headers
+        .get("X-PoW-Signature")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if pow_salt.is_empty() || pow_nonce.is_empty() || pow_sig.is_empty() {
+        return Err((StatusCode::UNAUTHORIZED, "Missing PoW headers".to_string()));
+    }
+
+    let pow_ts: u64 = pow_ts_str.parse().unwrap_or(0);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Check expiration (2 minutes)
+    if now.saturating_sub(pow_ts) > 120 {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "PoW challenge expired".to_string(),
+        ));
+    }
+
+    // Verify Signature
+    let difficulty = POW_DIFFICULTY;
+    type HmacSha256 = Hmac<Sha256>;
+    let mut mac =
+        HmacSha256::new_from_slice(&state.hmac_secret).expect("HMAC can take key of any size");
+    mac.update(pow_salt.as_bytes());
+    mac.update(difficulty.to_string().as_bytes());
+    mac.update(pow_ts.to_string().as_bytes());
+
+    if hex::encode(mac.finalize().into_bytes()) != pow_sig {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Invalid PoW signature".to_string(),
+        ));
+    }
+
+    // Verify Work
+    let mut hasher = Sha256::new();
+    hasher.update(pow_salt.as_bytes());
+    hasher.update(pow_nonce.as_bytes());
+    let hash = hex::encode(hasher.finalize());
+
+    if !hash.starts_with(&"0".repeat(difficulty)) {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "PoW difficulty not met".to_string(),
+        ));
+    }
+
     if paste.id.is_empty() {
         return Err((StatusCode::BAD_REQUEST, "ID cannot be empty".to_string()));
     }
 
-    let mut con = client
+    let mut con = state
+        .client
         .get_multiplexed_async_connection()
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -74,10 +191,11 @@ pub async fn create_paste(
 }
 
 pub async fn get_paste(
-    State(client): State<Client>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Paste>, StatusCode> {
-    let mut con = client
+    let mut con = state
+        .client
         .get_multiplexed_async_connection()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -122,11 +240,12 @@ pub async fn get_paste(
 }
 
 pub async fn delete_paste(
-    State(client): State<Client>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Result<StatusCode, StatusCode> {
-    let mut con = client
+    let mut con = state
+        .client
         .get_multiplexed_async_connection()
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

@@ -85,6 +85,20 @@ export const CreatePaste: React.FC = () => {
     setIsProcessing(true);
     setError(null);
     try {
+      // 0. Solve PoW Challenge
+      const challengeRes = await fetch('/api/v1/challenge');
+      if (!challengeRes.ok) throw new Error("Failed to get PoW challenge");
+      const challenge = await challengeRes.json();
+
+      const nonce = await CryptoService.solvePoW(challenge.salt, challenge.difficulty);
+
+      const powHeaders = {
+        'X-PoW-Salt': challenge.salt,
+        'X-PoW-Nonce': nonce,
+        'X-PoW-Timestamp': challenge.timestamp.toString(),
+        'X-PoW-Signature': challenge.signature
+      };
+
       // 1. Generate Content Key
       const contentKey = await CryptoService.generateKey();
 
@@ -145,7 +159,7 @@ export const CreatePaste: React.FC = () => {
         throw new Error("Paste is too large (Limit: 1.5MB)");
       }
 
-      await StorageService.savePaste(payload);
+      await StorageService.savePaste(payload, powHeaders);
 
       const origin = window.location.origin;
       const pathname = window.location.pathname || '/';
@@ -153,8 +167,8 @@ export const CreatePaste: React.FC = () => {
       setShareUrl(url);
 
     } catch (error) {
-      console.error("Encryption failed:", error);
-      setError("Failed to encrypt data. Please try again.");
+      console.error("Encryption/Upload failed:", error);
+      setError("Failed to create paste. Please try again.");
     } finally {
       setIsProcessing(false);
     }

@@ -9,6 +9,8 @@ use axum::{
     Router,
 };
 use dotenvy::dotenv;
+use handlers::AppState;
+use rand::Rng;
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -20,6 +22,14 @@ async fn main() {
 
     let client = db::create_client().expect("Failed to create Redis client");
 
+    let mut rng = rand::thread_rng();
+    let hmac_secret: [u8; 32] = rng.gen();
+
+    let state = AppState {
+        client,
+        hmac_secret,
+    };
+
     let cors = CorsLayer::new()
         .allow_origin(
             "http://localhost:3000"
@@ -30,6 +40,7 @@ async fn main() {
         .allow_headers(Any);
 
     let app = Router::new()
+        .route("/api/v1/challenge", get(handlers::get_challenge))
         .route("/api/v1/paste", post(handlers::create_paste))
         .route(
             "/api/v1/paste/:id",
@@ -38,7 +49,7 @@ async fn main() {
         .layer(DefaultBodyLimit::max(1024 * 1024 + 512 * 1024)) // 1.5MB limit
         .layer(cors)
         .layer(TraceLayer::new_for_http())
-        .with_state(client);
+        .with_state(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     println!("Listening on {}", addr);
