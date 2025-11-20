@@ -134,18 +134,8 @@ export const CreatePaste: React.FC = () => {
 
       await StorageService.savePaste(payload);
 
-      let origin = 'http://localhost';
-      try {
-        if (window.location.origin && window.location.origin !== 'null') {
-          origin = window.location.origin;
-        }
-      } catch (e) { }
-
-      let pathname = '/';
-      try {
-        pathname = window.location.pathname || '/';
-      } catch (e) { }
-
+      const origin = window.location.origin;
+      const pathname = window.location.pathname || '/';
       const url = `${origin}${pathname}#view/${id}${keyParam}`;
       setShareUrl(url);
 
