@@ -12,6 +12,78 @@
 
 <body>
   <div id="root"></div>
+  <noscript>
+    <style>
+      .noscript-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #09090b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        color: white;
+      }
+
+      .noscript-modal {
+        background-color: #18181b;
+        border: 1px solid #27272a;
+        border-radius: 0.75rem;
+        padding: 2.5rem;
+        max-width: 32rem;
+        text-align: center;
+        box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+      }
+
+      .noscript-icon {
+        color: #ef4444;
+        margin: 0 auto 1.5rem auto;
+        width: 48px;
+        height: 48px;
+      }
+
+      .noscript-title {
+        font-size: 1.875rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        letter-spacing: -0.025em;
+      }
+
+      .noscript-text {
+        color: #a1a1aa;
+        line-height: 1.625;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+      }
+
+      .noscript-highlight {
+        color: #a78bfa;
+        font-weight: 600;
+      }
+    </style>
+    <div class="noscript-overlay">
+      <div class="noscript-modal">
+        <svg class="noscript-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <h1 class="noscript-title">JavaScript Required</h1>
+        <p class="noscript-text">
+          Ghostbin relies on <span class="noscript-highlight">client-side encryption</span> to guarantee your privacy.
+          All encryption and decryption happens locally in your browser.
+        </p>
+        <p class="noscript-text">
+          Please enable JavaScript to securely create and view pastes.
+        </p>
+      </div>
+    </div>
+  </noscript>
   <script type="module" src="/src/index.tsx"></script>
 </body>
 
