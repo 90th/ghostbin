@@ -1,4 +1,4 @@
-# <img src="./Ghostbin.png" width="25" alt="logo" style="vertical-align: bottom;" /> ghostbin  [![CI](https://github.com/90th/ghostbin/actions/workflows/ci.yml/badge.svg)](https://github.com/90th/ghostbin/actions/workflows/ci.yml) [![Stars](https://img.shields.io/github/stars/90th/ghostbin?style=social)](https://github.com/90th/ghostbin/stargazers)
+# <img src="./Ghostbin.png" width="25" alt="logo" style="vertical-align: bottom;"/> ghostbin  [![CI](https://github.com/90th/ghostbin/actions/workflows/ci.yml/badge.svg)](https://github.com/90th/ghostbin/actions/workflows/ci.yml) [![Stars](https://img.shields.io/github/stars/90th/ghostbin?style=social)](https://github.com/90th/ghostbin/stargazers)
 
 a secure, ephemeral, zero-knowledge pastebin.
 client-side encryption. nothing hits the disk. ever.
@@ -19,7 +19,7 @@ if the server restarts, the power cuts, or the process is killed, the data is in
 - **tor support:** ships with a built-in tor hidden service configuration.
 
 ## stack
-- **frontend:** react + vite + typescript (tailwind + prismjs)
+- **frontend:** react + vite + typescript (bun)
 - **backend:** rust (axum + tokio)
 - **database:** redis (in-memory only)
 
@@ -43,11 +43,12 @@ cd backend
 cp .env.example .env
 cargo run
 ```
-**2. frontend (node)**
+
+**2. frontend (bun)**
 proxies api requests to localhost:8080.
 ```bash
-npm install
-npm run dev
+bun install
+bun dev
 ```
 
 ## api
