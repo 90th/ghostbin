@@ -1,5 +1,5 @@
 import React, { useState, useRef, useLayoutEffect } from 'react';
-import { Lock, Flame, Code, Copy, ExternalLink, KeyRound, ChevronRight, Clock } from 'lucide-react';
+import { Lock, Flame, Code, Copy, ExternalLink, KeyRound, ChevronRight, Clock, Dices, Eye, EyeOff } from 'lucide-react';
 import { Button } from './Button';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
@@ -67,6 +67,7 @@ export const CreatePaste: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const preRef = useRef<HTMLPreElement>(null);
 
@@ -169,6 +170,20 @@ export const CreatePaste: React.FC = () => {
     setBurnAfterRead(false);
     setExpiration(24 * 60 * 60 * 1000);
     setLanguage('plaintext');
+  };
+
+  const handleGeneratePassword = () => {
+    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+    const length = 17;
+    const randomValues = new Uint32Array(length);
+    window.crypto.getRandomValues(randomValues);
+
+    let newPassword = "";
+    for (let i = 0; i < length; i++) {
+      newPassword += charset[randomValues[i] % charset.length];
+    }
+    setPassword(newPassword);
+    setShowPassword(true);
   };
 
   const getHighlightedCode = () => {
@@ -307,12 +322,30 @@ export const CreatePaste: React.FC = () => {
             <KeyRound className={`h-4 w-4 transition-colors ${password ? 'text-brand-500' : 'text-gray-600 group-hover:text-gray-500'}`} />
           </div>
           <input
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Optional Master Password"
-            className="block w-full pl-10 pr-3 py-2 bg-bg-dark border border-transparent rounded text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:bg-bg-dark focus:ring-1 focus:ring-brand-900/50 transition-all font-mono"
+            className="block w-full pl-10 pr-20 py-2 bg-bg-dark border border-transparent rounded text-sm text-gray-300 placeholder-gray-600 focus:outline-none focus:bg-bg-dark focus:ring-1 focus:ring-brand-900/50 transition-all font-mono"
           />
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1">
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="p-1.5 text-gray-600 hover:text-brand-500 transition-colors rounded hover:bg-white/5"
+              title={showPassword ? "Hide Password" : "Show Password"}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+            <button
+              type="button"
+              onClick={handleGeneratePassword}
+              className="p-1.5 text-gray-600 hover:text-brand-500 transition-colors rounded hover:bg-white/5"
+              title="Generate Secure Password"
+            >
+              <Dices className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {/* Options Divider (Hidden on mobile) */}
