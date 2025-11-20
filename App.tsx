@@ -2,9 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Layout } from './components/Layout';
 import { CreatePaste } from './components/CreatePaste';
 import { ViewPaste } from './components/ViewPaste';
+import { AboutPage } from './components/AboutPage';
 
 const App: React.FC = () => {
-  const [route, setRoute] = useState<'create' | 'view'>('create');
+  const [route, setRoute] = useState<'create' | 'view' | 'about'>('create');
   const [viewParams, setViewParams] = useState<{ id: string; key: string | null } | null>(null);
   const [createKey, setCreateKey] = useState(0);
 
@@ -52,6 +53,16 @@ const App: React.FC = () => {
       } catch (e) {
         console.warn('Navigation hash update blocked:', e);
       }
+    } else if (dest === 'about') {
+      setRoute('about');
+      setViewParams(null);
+      try {
+        if (window.location.hash !== '') {
+          window.location.hash = '';
+        }
+      } catch (e) {
+        console.warn('Navigation hash update blocked:', e);
+      }
     }
   }, []);
 
@@ -71,6 +82,10 @@ const App: React.FC = () => {
             onBack={() => handleNavigate('create')}
           />
         </div>
+      )}
+
+      {route === 'about' && (
+        <AboutPage />
       )}
     </Layout>
   );
