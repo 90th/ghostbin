@@ -70,7 +70,7 @@ export const deriveKeyFromPassword = async (password: string, salt: Uint8Array):
     password,
     salt: salt as any,
     parallelism: 1,
-    iterations: 4,
+    iterations: 8,
     memorySize: 65536, // 64MB
     hashLength: 32,    // 256 bits
     outputType: 'hex',
