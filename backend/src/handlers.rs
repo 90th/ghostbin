@@ -4,6 +4,7 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
+use constant_time_eq::constant_time_eq;
 use hmac::{Hmac, Mac};
 use rand::Rng;
 use redis::{AsyncCommands, Client};
@@ -268,7 +269,7 @@ pub async fn delete_paste(
             hasher.update(token.as_bytes());
             let provided_hash = hex::encode(hasher.finalize());
 
-            if provided_hash != stored_hash {
+            if !constant_time_eq(provided_hash.as_bytes(), stored_hash.as_bytes()) {
                 return Err(StatusCode::UNAUTHORIZED);
             }
         }
