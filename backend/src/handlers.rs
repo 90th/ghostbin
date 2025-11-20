@@ -1,10 +1,11 @@
 use crate::model::Paste;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     Json,
 };
 use redis::{AsyncCommands, Client};
+use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub async fn create_paste(
@@ -90,9 +91,9 @@ pub async fn get_paste(
         serde_json::from_str(&json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     if paste.burn_after_read && !paste.has_password {
-        // Delete immediately ONLY if it's not password protected
+        // set panic ttl (10 mins) to ensure deletion if client crashes
         let _: () = con
-            .del(&key)
+            .expire(&key, 600)
             .await
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     } else {
@@ -123,6 +124,7 @@ pub async fn get_paste(
 pub async fn delete_paste(
     State(client): State<Client>,
     Path(id): Path<String>,
+    headers: HeaderMap,
 ) -> Result<StatusCode, StatusCode> {
     let mut con = client
         .get_multiplexed_async_connection()
@@ -130,6 +132,28 @@ pub async fn delete_paste(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let key = format!("paste:{}", id);
+
+    // fetch metadata to check for burn token
+    let json: String = con.get(&key).await.map_err(|_| StatusCode::NOT_FOUND)?;
+    let paste: Paste =
+        serde_json::from_str(&json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if paste.burn_after_read {
+        if let Some(stored_hash) = paste.burn_token_hash {
+            let token = headers
+                .get("X-Burn-Token")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("");
+
+            let mut hasher = Sha256::new();
+            hasher.update(token.as_bytes());
+            let provided_hash = hex::encode(hasher.finalize());
+
+            if provided_hash != stored_hash {
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+        }
+    }
 
     let _: () = con
         .del(&key)

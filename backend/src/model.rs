@@ -15,4 +15,5 @@ pub struct Paste {
     pub salt: Option<String>,
     pub encrypted_key: Option<String>,
     pub key_iv: Option<String>,
+    pub burn_token_hash: Option<String>,
 }

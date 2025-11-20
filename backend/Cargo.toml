@@ -13,3 +13,5 @@ tower-http = { version = "0.5", features = ["cors", "trace"] }
 dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sha2 = "0.10"
+hex = "0.4"
