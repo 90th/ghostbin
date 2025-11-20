@@ -3,6 +3,7 @@ mod handlers;
 mod model;
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::Method,
     routing::{get, post},
     Router,
@@ -34,6 +35,7 @@ async fn main() {
             "/api/v1/paste/:id",
             get(handlers::get_paste).delete(handlers::delete_paste),
         )
+        .layer(DefaultBodyLimit::max(1024 * 1024 + 512 * 1024)) // 1.5MB limit
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(client);

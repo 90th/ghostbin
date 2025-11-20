@@ -123,6 +123,12 @@ export const CreatePaste: React.FC = () => {
         keyParam = `&key=${keyString}`;
       }
 
+      // Check payload size (1.5MB limit)
+      const payloadSize = new Blob([JSON.stringify(payload)]).size;
+      if (payloadSize > 1.5 * 1024 * 1024) {
+        throw new Error("Paste is too large (Limit: 1.5MB)");
+      }
+
       await StorageService.savePaste(payload);
 
       let origin = 'https://ghostbin.app';
