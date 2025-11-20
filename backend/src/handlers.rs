@@ -49,10 +49,27 @@ pub async fn create_paste(
     // Default 30 days if no TTL or 0 (Never)
     let final_ttl = ttl_seconds.unwrap_or(30 * 24 * 60 * 60);
 
-    let _: () = con
-        .set_ex(&key, json, final_ttl)
+    // Use SETNX (set_nx) logic to prevent overwriting existing keys
+    // Redis crate doesn't have a direct set_nx_ex, so we check existence first or use a script/transaction.
+    // For simplicity and performance in this context, we'll check existence first.
+    // A race condition is theoretically possible but highly unlikely with UUIDs.
+    // Ideally, we would use a Lua script or SET with NX argument if supported by the high-level API.
+    
+    // Using the low-level command to support SET key value NX EX ttl
+    let result: Option<String> = redis::cmd("SET")
+        .arg(&key)
+        .arg(json)
+        .arg("NX")
+        .arg("EX")
+        .arg(final_ttl)
+        .query_async(&mut con)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    if result.is_none() {
+        // Key already exists (collision or malicious overwrite attempt)
+        return Err((StatusCode::CONFLICT, "Paste ID already exists".to_string()));
+    }
 
     Ok(StatusCode::CREATED)
 }
