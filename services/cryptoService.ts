@@ -1,3 +1,5 @@
+import { argon2id } from 'hash-wasm';
+
 /**
  * Client-side encryption service using Web Crypto API.
  * Nothing leaves the browser unencrypted.
@@ -42,26 +44,34 @@ export const generateSalt = (): Uint8Array => {
   return window.crypto.getRandomValues(new Uint8Array(16));
 };
 
-// Derive a key from a password using PBKDF2
-export const deriveKeyFromPassword = async (password: string, salt: Uint8Array): Promise<CryptoKey> => {
-  const encoder = new TextEncoder();
-  const keyMaterial = await window.crypto.subtle.importKey(
-    "raw",
-    encoder.encode(password),
-    { name: "PBKDF2" },
-    false,
-    ["deriveKey"]
-  );
+// Helper to convert Hex string to Uint8Array
+const hexToUint8Array = (hex: string): Uint8Array => {
+  const len = hex.length;
+  const bytes = new Uint8Array(len / 2);
+  for (let i = 0; i < len; i += 2) {
+    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return bytes;
+};
 
-  return window.crypto.subtle.deriveKey(
-    {
-      name: "PBKDF2",
-      salt: salt,
-      iterations: 100000,
-      hash: "SHA-256",
-    },
-    keyMaterial,
-    { name: "AES-GCM", length: 256 },
+// Derive a key from a password using Argon2id
+export const deriveKeyFromPassword = async (password: string, salt: Uint8Array): Promise<CryptoKey> => {
+  const derivedKeyHex = await argon2id({
+    password,
+    salt: salt as any,
+    parallelism: 1,
+    iterations: 4,
+    memorySize: 65536, // 64MB
+    hashLength: 32,    // 256 bits
+    outputType: 'hex',
+  });
+
+  const keyBuffer = hexToUint8Array(derivedKeyHex);
+
+  return window.crypto.subtle.importKey(
+    "raw",
+    keyBuffer as any,
+    { name: "AES-GCM" },
     true,
     ["encrypt", "decrypt"]
   );

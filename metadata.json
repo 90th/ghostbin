@@ -1,5 +1,5 @@
 {
   "name": "Ghostbin",
-  "description": "A secure, client-side end-to-end encrypted pastebin with onion-routing aesthetics.",
+  "description": "A secure, client-side end-to-end encrypted pastebin",
   "requestFramePermissions": []
 }
