@@ -16,6 +16,8 @@ export interface EncryptedPaste {
   burnTokenHash?: string; // SHA-256 hash of the burn token
 }
 
+export type CreatePastePayload = Omit<EncryptedPaste, 'id'>;
+
 export interface DecryptedPaste {
   id: string;
   text: string;

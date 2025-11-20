@@ -1,4 +1,4 @@
-use crate::model::Paste;
+use crate::model::{CreatePasteRequest, CreatePasteResponse, Paste};
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
@@ -11,6 +11,7 @@ use redis::{AsyncCommands, Client};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -62,8 +63,8 @@ pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeRespo
 pub async fn create_paste(
     State(state): State<AppState>,
     headers: HeaderMap,
-    Json(paste): Json<Paste>,
-) -> Result<StatusCode, (StatusCode, String)> {
+    Json(req): Json<CreatePasteRequest>,
+) -> Result<(StatusCode, Json<CreatePasteResponse>), (StatusCode, String)> {
     // 1. Verify PoW
     let pow_salt = headers
         .get("X-PoW-Salt")
@@ -129,9 +130,23 @@ pub async fn create_paste(
         ));
     }
 
-    if paste.id.is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "ID cannot be empty".to_string()));
-    }
+    let id = Uuid::new_v4().to_string();
+
+    let paste = Paste {
+        id: id.clone(),
+        iv: req.iv,
+        data: req.data,
+        created_at: req.created_at,
+        expires_at: req.expires_at,
+        burn_after_read: req.burn_after_read,
+        views: req.views,
+        language: req.language,
+        has_password: req.has_password,
+        salt: req.salt,
+        encrypted_key: req.encrypted_key,
+        key_iv: req.key_iv,
+        burn_token_hash: req.burn_token_hash,
+    };
 
     let mut con = state
         .client
@@ -188,7 +203,7 @@ pub async fn create_paste(
         return Err((StatusCode::CONFLICT, "Paste ID already exists".to_string()));
     }
 
-    Ok(StatusCode::CREATED)
+    Ok((StatusCode::CREATED, Json(CreatePasteResponse { id })))
 }
 
 pub async fn get_paste(

@@ -3,7 +3,7 @@ import { Lock, Flame, Code, Copy, ExternalLink, KeyRound, ChevronRight, Clock, D
 import { Button } from './Button';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
-import { EncryptedPaste } from '../types';
+import { EncryptedPaste, CreatePastePayload } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
@@ -121,9 +121,7 @@ export const CreatePaste: React.FC = () => {
       const expiresAt = expiration > 0 ? Date.now() + expiration : undefined;
 
       // 4. Prepare payload
-      const id = uuidv4();
-      let payload: EncryptedPaste = {
-        id,
+      let payload: CreatePastePayload = {
         iv: contentIv,
         data: encryptedContent,
         createdAt: Date.now(),
@@ -159,7 +157,7 @@ export const CreatePaste: React.FC = () => {
         throw new Error("Paste is too large (Limit: 1.5MB)");
       }
 
-      await StorageService.savePaste(payload, powHeaders);
+      const id = await StorageService.savePaste(payload, powHeaders);
 
       const origin = window.location.origin;
       const pathname = window.location.pathname || '/';

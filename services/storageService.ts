@@ -1,8 +1,8 @@
-import { EncryptedPaste } from '../types';
+import { EncryptedPaste, CreatePastePayload } from '../types';
 
 const API_BASE = '/api/v1';
 
-export const savePaste = async (paste: EncryptedPaste, headers?: Record<string, string>): Promise<void> => {
+export const savePaste = async (paste: CreatePastePayload, headers?: Record<string, string>): Promise<string> => {
   const response = await fetch(`${API_BASE}/paste`, {
     method: 'POST',
     headers: {
@@ -15,6 +15,9 @@ export const savePaste = async (paste: EncryptedPaste, headers?: Record<string, 
   if (!response.ok) {
     throw new Error(`Server error: ${response.status}`);
   }
+
+  const data = await response.json();
+  return data.id;
 };
 
 export const getPaste = async (id: string): Promise<EncryptedPaste | null> => {
