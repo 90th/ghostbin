@@ -47,15 +47,13 @@ pub async fn create_paste(
     };
 
     // Default 30 days if no TTL or 0 (Never)
-    let final_ttl = ttl_seconds.unwrap_or(30 * 24 * 60 * 60);
+    let mut final_ttl = ttl_seconds.unwrap_or(30 * 24 * 60 * 60);
 
-    // Use SETNX (set_nx) logic to prevent overwriting existing keys
-    // Redis crate doesn't have a direct set_nx_ex, so we check existence first or use a script/transaction.
-    // For simplicity and performance in this context, we'll check existence first.
-    // A race condition is theoretically possible but highly unlikely with UUIDs.
-    // Ideally, we would use a Lua script or SET with NX argument if supported by the high-level API.
-    
-    // Using the low-level command to support SET key value NX EX ttl
+    const MAX_TTL: u64 = 30 * 24 * 60 * 60;
+    if final_ttl > MAX_TTL {
+        final_ttl = MAX_TTL;
+    }
+
     let result: Option<String> = redis::cmd("SET")
         .arg(&key)
         .arg(json)
