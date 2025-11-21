@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::model::{CreatePasteRequest, CreatePasteResponse, Paste};
 use axum::{
     extract::{Path, State},
@@ -64,7 +65,7 @@ pub async fn create_paste(
     State(state): State<AppState>,
     headers: HeaderMap,
     Json(req): Json<CreatePasteRequest>,
-) -> Result<(StatusCode, Json<CreatePasteResponse>), (StatusCode, String)> {
+) -> Result<(StatusCode, Json<CreatePasteResponse>), AppError> {
     // 1. Verify PoW
     let pow_salt = headers
         .get("X-PoW-Salt")
@@ -84,7 +85,7 @@ pub async fn create_paste(
         .unwrap_or("");
 
     if pow_salt.is_empty() || pow_nonce.is_empty() || pow_sig.is_empty() {
-        return Err((StatusCode::UNAUTHORIZED, "Missing PoW headers".to_string()));
+        return Err(AppError::Unauthorized("Missing PoW headers".to_string()));
     }
 
     let pow_ts: u64 = pow_ts_str.parse().unwrap_or(0);
@@ -95,10 +96,7 @@ pub async fn create_paste(
 
     // Check expiration (2 minutes)
     if now.saturating_sub(pow_ts) > 120 {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            "PoW challenge expired".to_string(),
-        ));
+        return Err(AppError::Unauthorized("PoW challenge expired".to_string()));
     }
 
     // Verify Signature
@@ -111,10 +109,7 @@ pub async fn create_paste(
     mac.update(pow_ts.to_string().as_bytes());
 
     if hex::encode(mac.finalize().into_bytes()) != pow_sig {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            "Invalid PoW signature".to_string(),
-        ));
+        return Err(AppError::Unauthorized("Invalid PoW signature".to_string()));
     }
 
     // Verify Work
@@ -124,10 +119,7 @@ pub async fn create_paste(
     let hash = hex::encode(hasher.finalize());
 
     if !hash.starts_with(&"0".repeat(difficulty)) {
-        return Err((
-            StatusCode::UNAUTHORIZED,
-            "PoW difficulty not met".to_string(),
-        ));
+        return Err(AppError::Unauthorized("PoW difficulty not met".to_string()));
     }
 
     let id = Uuid::new_v4().to_string();
@@ -148,15 +140,10 @@ pub async fn create_paste(
         burn_token_hash: req.burn_token_hash,
     };
 
-    let mut con = state
-        .client
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let mut con = state.client.get_multiplexed_async_connection().await?;
 
     let key = format!("paste:{}", paste.id);
-    let json = serde_json::to_string(&paste)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let json = serde_json::to_string(&paste)?;
 
     // Calculate TTL
     let ttl_seconds = if let Some(expires_at) = paste.expires_at {
@@ -171,7 +158,7 @@ pub async fn create_paste(
                 Some((diff / 1000) as u64)
             } else {
                 // Already expired
-                return Err((StatusCode::BAD_REQUEST, "Paste already expired".to_string()));
+                return Err(AppError::BadRequest("Paste already expired".to_string()));
             }
         } else {
             None
@@ -195,12 +182,11 @@ pub async fn create_paste(
         .arg("EX")
         .arg(final_ttl)
         .query_async(&mut con)
-        .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        .await?;
 
     if result.is_none() {
         // Key already exists (collision or malicious overwrite attempt)
-        return Err((StatusCode::CONFLICT, "Paste ID already exists".to_string()));
+        return Err(AppError::Conflict("Paste ID already exists".to_string()));
     }
 
     Ok((StatusCode::CREATED, Json(CreatePasteResponse { id })))
@@ -209,27 +195,20 @@ pub async fn create_paste(
 pub async fn get_paste(
     State(state): State<AppState>,
     Path(id): Path<String>,
-) -> Result<Json<Paste>, StatusCode> {
-    let mut con = state
-        .client
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+) -> Result<Json<Paste>, AppError> {
+    let mut con = state.client.get_multiplexed_async_connection().await?;
 
     let key = format!("paste:{}", id);
 
     // Get paste
-    let json: String = con.get(&key).await.map_err(|_| StatusCode::NOT_FOUND)?;
+    let json: Option<String> = con.get(&key).await?;
+    let json = json.ok_or(AppError::PasteNotFound)?;
 
-    let mut paste: Paste =
-        serde_json::from_str(&json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut paste: Paste = serde_json::from_str(&json)?;
 
     if paste.burn_after_read && !paste.has_password {
         // set panic ttl (90s) burn burn burn away
-        let _: () = con
-            .expire(&key, 90)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let _: () = con.expire(&key, 90).await?;
     } else {
         // Increment views
         paste.views += 1;
@@ -237,18 +216,12 @@ pub async fn get_paste(
         // Update in Redis, preserving TTL
         let ttl: i64 = con.ttl(&key).await.unwrap_or(-1);
 
-        let new_json = serde_json::to_string(&paste).unwrap();
+        let new_json = serde_json::to_string(&paste)?;
 
         if ttl > 0 {
-            let _: () = con
-                .set_ex(&key, new_json, ttl as u64)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let _: () = con.set_ex(&key, new_json, ttl as u64).await?;
         } else {
-            let _: () = con
-                .set(&key, new_json)
-                .await
-                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            let _: () = con.set(&key, new_json).await?;
         }
     }
 
@@ -259,19 +232,15 @@ pub async fn delete_paste(
     State(state): State<AppState>,
     Path(id): Path<String>,
     headers: HeaderMap,
-) -> Result<StatusCode, StatusCode> {
-    let mut con = state
-        .client
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+) -> Result<StatusCode, AppError> {
+    let mut con = state.client.get_multiplexed_async_connection().await?;
 
     let key = format!("paste:{}", id);
 
     // fetch metadata to check for burn token
-    let json: String = con.get(&key).await.map_err(|_| StatusCode::NOT_FOUND)?;
-    let paste: Paste =
-        serde_json::from_str(&json).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let json: Option<String> = con.get(&key).await?;
+    let json = json.ok_or(AppError::PasteNotFound)?;
+    let paste: Paste = serde_json::from_str(&json)?;
 
     if paste.burn_after_read {
         if let Some(stored_hash) = paste.burn_token_hash {
@@ -285,15 +254,12 @@ pub async fn delete_paste(
             let provided_hash = hex::encode(hasher.finalize());
 
             if !constant_time_eq(provided_hash.as_bytes(), stored_hash.as_bytes()) {
-                return Err(StatusCode::UNAUTHORIZED);
+                return Err(AppError::Unauthorized("Invalid burn token".to_string()));
             }
         }
     }
 
-    let _: () = con
-        .del(&key)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let _: () = con.del(&key).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }

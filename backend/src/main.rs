@@ -1,4 +1,5 @@
 mod db;
+mod error;
 mod handlers;
 mod model;
 

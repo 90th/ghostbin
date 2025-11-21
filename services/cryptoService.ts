@@ -68,7 +68,7 @@ const hexToUint8Array = (hex: string): Uint8Array => {
 export const deriveKeyFromPassword = async (password: string, salt: Uint8Array): Promise<CryptoKey> => {
   const derivedKeyHex = await argon2id({
     password,
-    salt: salt as any,
+    salt,
     parallelism: 1,
     iterations: 8,
     memorySize: 65536, // 64MB
@@ -80,7 +80,7 @@ export const deriveKeyFromPassword = async (password: string, salt: Uint8Array):
 
   return window.crypto.subtle.importKey(
     "raw",
-    keyBuffer as any,
+    keyBuffer as BufferSource,
     { name: "AES-GCM" },
     true,
     ["encrypt", "decrypt"]
