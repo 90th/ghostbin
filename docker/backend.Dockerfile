@@ -24,4 +24,6 @@ COPY --from=builder /usr/src/app/target/release/ghostbin-server /usr/local/bin/g
 ENV REDIS_URL=redis://redis:6379
 EXPOSE 8080
 
+USER nonroot:nonroot
+
 CMD ["ghostbin-server"]
