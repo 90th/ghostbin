@@ -213,16 +213,15 @@ pub async fn get_paste(
         // Increment views
         paste.views += 1;
 
-        // Update in Redis, preserving TTL
-        let ttl: i64 = con.ttl(&key).await.unwrap_or(-1);
-
         let new_json = serde_json::to_string(&paste)?;
 
-        if ttl > 0 {
-            let _: () = con.set_ex(&key, new_json, ttl as u64).await?;
-        } else {
-            let _: () = con.set(&key, new_json).await?;
-        }
+        // Update in Redis using KEEPTTL to preserve expiration atomically
+        let _: () = redis::cmd("SET")
+            .arg(&key)
+            .arg(new_json)
+            .arg("KEEPTTL")
+            .query_async(&mut con)
+            .await?;
     }
 
     Ok(Json(paste))
