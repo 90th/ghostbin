@@ -25,9 +25,8 @@ impl IntoResponse for AppError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "Server busy, please try again later".to_string(),
             ),
-            AppError::InternalServerError(err) => {
-                // In a real app, we might want to log this error
-                eprintln!("Internal server error: {:?}", err);
+            AppError::InternalServerError(_) => {
+                // silence. logging hits the disk (docker logs). we don't do that here.
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Internal server error".to_string(),
