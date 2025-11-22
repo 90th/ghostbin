@@ -20,16 +20,33 @@ export const savePaste = async (paste: CreatePastePayload, headers?: Record<stri
   return data.id;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const getPaste = async (id: string): Promise<EncryptedPaste | null> => {
-  const response = await fetch(`${API_BASE}/paste/${id}`);
+  let attempt = 0;
+  const maxRetries = 3;
+  let delay = 300;
 
-  if (response.status === 404) return null;
+  while (true) {
+    const response = await fetch(`${API_BASE}/paste/${id}`);
 
-  if (!response.ok) {
+    if (response.status === 404) return null;
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    if (response.status === 429 || response.status >= 500) {
+      if (attempt < maxRetries) {
+        attempt++;
+        await sleep(delay);
+        delay *= 2;
+        continue;
+      }
+    }
+
     throw new Error(`Server error: ${response.status}`);
   }
-
-  return response.json();
 };
 
 export const deletePaste = async (id: string, burnToken?: string): Promise<void> => {
