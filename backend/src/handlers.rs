@@ -6,9 +6,10 @@ use axum::{
     Json,
 };
 use constant_time_eq::constant_time_eq;
+use deadpool_redis::redis::AsyncCommands;
+use deadpool_redis::Pool;
 use hmac::{Hmac, Mac};
 use rand::Rng;
-use redis::{AsyncCommands, Client};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,7 +17,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub client: Client,
+    pub pool: Pool,
     pub hmac_secret: [u8; 32],
 }
 
@@ -87,11 +88,15 @@ pub async fn create_paste(
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Signature header".to_string()))?;
 
-    let mut con = state.client.get_multiplexed_async_connection().await?;
+    let mut con = state
+        .pool
+        .get()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.into()))?;
     let salt_key = format!("pow:salt:{}", pow_salt);
 
     // Atomic check and set to prevent race conditions (TOCTOU)
-    let set_result: Option<String> = redis::cmd("SET")
+    let set_result: Option<String> = deadpool_redis::redis::cmd("SET")
         .arg(&salt_key)
         .arg("used")
         .arg("NX")
@@ -193,7 +198,7 @@ pub async fn create_paste(
         final_ttl = MAX_TTL;
     }
 
-    let result: Option<String> = redis::cmd("SET")
+    let result: Option<String> = deadpool_redis::redis::cmd("SET")
         .arg(&key)
         .arg(json)
         .arg("NX")
@@ -214,7 +219,11 @@ pub async fn get_paste(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Paste>, AppError> {
-    let mut con = state.client.get_multiplexed_async_connection().await?;
+    let mut con = state
+        .pool
+        .get()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.into()))?;
 
     let key = format!("paste:{}", id);
 
@@ -234,7 +243,7 @@ pub async fn get_paste(
         let new_json = serde_json::to_string(&paste)?;
 
         // Update in Redis using KEEPTTL to preserve expiration atomically
-        let _: () = redis::cmd("SET")
+        let _: () = deadpool_redis::redis::cmd("SET")
             .arg(&key)
             .arg(new_json)
             .arg("KEEPTTL")
@@ -250,7 +259,11 @@ pub async fn delete_paste(
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Result<StatusCode, AppError> {
-    let mut con = state.client.get_multiplexed_async_connection().await?;
+    let mut con = state
+        .pool
+        .get()
+        .await
+        .map_err(|e| AppError::InternalServerError(e.into()))?;
 
     let key = format!("paste:{}", id);
 

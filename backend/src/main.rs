@@ -21,15 +21,12 @@ async fn main() {
     dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let client = db::create_client().expect("Failed to create Redis client");
+    let pool = db::create_pool().expect("Failed to create Redis pool");
 
     let mut rng = rand::thread_rng();
     let hmac_secret: [u8; 32] = rng.gen();
 
-    let state = AppState {
-        client,
-        hmac_secret,
-    };
+    let state = AppState { pool, hmac_secret };
 
     let frontend_url =
         std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
