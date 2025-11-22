@@ -65,12 +65,7 @@ pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeRespo
     })
 }
 
-pub async fn create_paste(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-    Json(req): Json<CreatePasteRequest>,
-) -> Result<(StatusCode, Json<CreatePasteResponse>), AppError> {
-    // 1. Verify PoW
+async fn verify_proof_of_work(state: &AppState, headers: &HeaderMap) -> Result<(), AppError> {
     let pow_salt = headers
         .get("X-PoW-Salt")
         .and_then(|v| v.to_str().ok())
@@ -91,38 +86,6 @@ pub async fn create_paste(
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Signature header".to_string()))?;
 
-    // Input Validation
-    if req.language.len() > 20
-        || !req
-            .language
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '+' || c == '-' || c == '#' || c == '_')
-    {
-        return Err(AppError::BadRequest("Invalid language".to_string()));
-    }
-
-    if req.iv.len() > 512 {
-        return Err(AppError::BadRequest("IV too long".to_string()));
-    }
-
-    if let Some(ref salt) = req.salt {
-        if salt.len() > 512 {
-            return Err(AppError::BadRequest("Salt too long".to_string()));
-        }
-    }
-
-    if let Some(ref key) = req.encrypted_key {
-        if key.len() > 512 {
-            return Err(AppError::BadRequest("Encrypted key too long".to_string()));
-        }
-    }
-
-    if let Some(ref iv) = req.key_iv {
-        if iv.len() > 512 {
-            return Err(AppError::BadRequest("Key IV too long".to_string()));
-        }
-    }
-
     let mut con = state
         .pool
         .get()
@@ -138,7 +101,8 @@ pub async fn create_paste(
         .arg("EX")
         .arg(120)
         .query_async(&mut con)
-        .await?;
+        .await
+        .map_err(|_| AppError::InternalServerError)?;
 
     if set_result.is_none() {
         return Err(AppError::Unauthorized("PoW salt already used".to_string()));
@@ -181,6 +145,54 @@ pub async fn create_paste(
     if !hash.starts_with(&"0".repeat(difficulty)) {
         return Err(AppError::Unauthorized("PoW difficulty not met".to_string()));
     }
+
+    Ok(())
+}
+
+pub async fn create_paste(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<CreatePasteRequest>,
+) -> Result<(StatusCode, Json<CreatePasteResponse>), AppError> {
+    verify_proof_of_work(&state, &headers).await?;
+
+    // Input Validation
+    if req.language.len() > 20
+        || !req
+            .language
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '+' || c == '-' || c == '#' || c == '_')
+    {
+        return Err(AppError::BadRequest("Invalid language".to_string()));
+    }
+
+    if req.iv.len() > 512 {
+        return Err(AppError::BadRequest("IV too long".to_string()));
+    }
+
+    if let Some(ref salt) = req.salt {
+        if salt.len() > 512 {
+            return Err(AppError::BadRequest("Salt too long".to_string()));
+        }
+    }
+
+    if let Some(ref key) = req.encrypted_key {
+        if key.len() > 512 {
+            return Err(AppError::BadRequest("Encrypted key too long".to_string()));
+        }
+    }
+
+    if let Some(ref iv) = req.key_iv {
+        if iv.len() > 512 {
+            return Err(AppError::BadRequest("Key IV too long".to_string()));
+        }
+    }
+
+    let mut con = state
+        .pool
+        .get()
+        .await
+        .map_err(|_| AppError::InternalServerError)?;
 
     let id = Uuid::new_v4().to_string();
 
