@@ -12,13 +12,16 @@ use hmac::{Hmac, Mac};
 use rand::Rng;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: Pool,
     pub hmac_secret: [u8; 32],
+    pub read_limiter: Arc<Semaphore>,
 }
 
 #[derive(Serialize)]
@@ -219,6 +222,11 @@ pub async fn get_paste(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Paste>, AppError> {
+    let _permit = state
+        .read_limiter
+        .try_acquire()
+        .map_err(|_| AppError::TooManyRequests)?;
+
     let mut con = state
         .pool
         .get()

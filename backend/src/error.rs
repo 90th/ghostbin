@@ -10,6 +10,7 @@ pub enum AppError {
     Unauthorized(String),
     BadRequest(String),
     Conflict(String),
+    TooManyRequests,
     InternalServerError(anyhow::Error),
 }
 
@@ -20,6 +21,10 @@ impl IntoResponse for AppError {
             AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg),
+            AppError::TooManyRequests => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "Server busy, please try again later".to_string(),
+            ),
             AppError::InternalServerError(err) => {
                 // In a real app, we might want to log this error
                 eprintln!("Internal server error: {:?}", err);

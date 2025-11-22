@@ -13,8 +13,12 @@ use dotenvy::dotenv;
 use handlers::AppState;
 use rand::Rng;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+
+const MAX_CONCURRENT_READS: usize = 50;
 
 #[tokio::main]
 async fn main() {
@@ -26,7 +30,13 @@ async fn main() {
     let mut rng = rand::thread_rng();
     let hmac_secret: [u8; 32] = rng.gen();
 
-    let state = AppState { pool, hmac_secret };
+    let read_limiter = Arc::new(Semaphore::new(MAX_CONCURRENT_READS));
+
+    let state = AppState {
+        pool,
+        hmac_secret,
+        read_limiter,
+    };
 
     let frontend_url =
         std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
