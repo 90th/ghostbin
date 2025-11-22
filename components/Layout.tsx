@@ -26,7 +26,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, onNavigate }) => {
           <nav className="flex items-center gap-6">
             <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('create') }} className="text-xs font-mono text-gray-500 hover:text-brand-500 transition-colors uppercase tracking-wider">New Paste</a>
             <a href="#" onClick={(e) => { e.preventDefault(); onNavigate('about') }} className="text-xs font-mono text-gray-500 hover:text-brand-500 transition-colors uppercase tracking-wider">About</a>
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="text-gray-600 hover:text-gray-300">
+            <a href="https://github.com/90th/ghostbin" target="_blank" rel="noreferrer" className="text-gray-600 hover:text-gray-300">
               <Github className="w-4 h-4" />
             </a>
           </nav>
