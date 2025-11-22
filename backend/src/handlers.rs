@@ -88,6 +88,13 @@ pub async fn create_paste(
         return Err(AppError::Unauthorized("Missing PoW headers".to_string()));
     }
 
+    let mut con = state.client.get_multiplexed_async_connection().await?;
+    let salt_key = format!("pow:salt:{}", pow_salt);
+
+    if con.exists(&salt_key).await? {
+        return Err(AppError::Unauthorized("PoW salt already used".to_string()));
+    }
+
     let pow_ts: u64 = pow_ts_str.parse().unwrap_or(0);
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -140,8 +147,6 @@ pub async fn create_paste(
         burn_token_hash: req.burn_token_hash,
     };
 
-    let mut con = state.client.get_multiplexed_async_connection().await?;
-
     let key = format!("paste:{}", paste.id);
     let json = serde_json::to_string(&paste)?;
 
@@ -174,6 +179,8 @@ pub async fn create_paste(
     if final_ttl > MAX_TTL {
         final_ttl = MAX_TTL;
     }
+
+    let _: () = con.set_ex(&salt_key, "used", 120).await?;
 
     let result: Option<String> = redis::cmd("SET")
         .arg(&key)
