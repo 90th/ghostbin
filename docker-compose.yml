@@ -1,7 +1,7 @@
 services:
   redis:
     image: redis:7-alpine
-    command: redis-server --save "" --appendonly no
+    command: redis-server --save "" --appendonly no --maxmemory 512mb --maxmemory-policy allkeys-lru --rename-command CONFIG "" --rename-command FLUSHDB "" --rename-command FLUSHALL "" --rename-command MODULE ""
     restart: always
     mem_swappiness: 0
     ulimits:
