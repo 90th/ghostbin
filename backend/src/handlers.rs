@@ -91,6 +91,38 @@ pub async fn create_paste(
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Signature header".to_string()))?;
 
+    // Input Validation
+    if req.language.len() > 20
+        || !req
+            .language
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '+' || c == '-' || c == '#' || c == '_')
+    {
+        return Err(AppError::BadRequest("Invalid language".to_string()));
+    }
+
+    if req.iv.len() > 512 {
+        return Err(AppError::BadRequest("IV too long".to_string()));
+    }
+
+    if let Some(ref salt) = req.salt {
+        if salt.len() > 512 {
+            return Err(AppError::BadRequest("Salt too long".to_string()));
+        }
+    }
+
+    if let Some(ref key) = req.encrypted_key {
+        if key.len() > 512 {
+            return Err(AppError::BadRequest("Encrypted key too long".to_string()));
+        }
+    }
+
+    if let Some(ref iv) = req.key_iv {
+        if iv.len() > 512 {
+            return Err(AppError::BadRequest("Key IV too long".to_string()));
+        }
+    }
+
     let mut con = state
         .pool
         .get()
