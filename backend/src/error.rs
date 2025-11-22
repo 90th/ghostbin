@@ -11,7 +11,7 @@ pub enum AppError {
     BadRequest(String),
     Conflict(String),
     TooManyRequests,
-    InternalServerError(anyhow::Error),
+    InternalServerError,
 }
 
 impl IntoResponse for AppError {
@@ -25,13 +25,10 @@ impl IntoResponse for AppError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "Server busy, please try again later".to_string(),
             ),
-            AppError::InternalServerError(_) => {
-                // silence. logging hits the disk (docker logs). we don't do that here.
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Internal server error".to_string(),
-                )
-            }
+            AppError::InternalServerError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Internal server error".to_string(),
+            ),
         };
 
         let body = Json(json!({
@@ -46,7 +43,7 @@ impl<E> From<E> for AppError
 where
     E: Into<anyhow::Error>,
 {
-    fn from(err: E) -> Self {
-        Self::InternalServerError(err.into())
+    fn from(_err: E) -> Self {
+        Self::InternalServerError
     }
 }

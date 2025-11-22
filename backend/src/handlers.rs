@@ -127,7 +127,7 @@ pub async fn create_paste(
         .pool
         .get()
         .await
-        .map_err(|e| AppError::InternalServerError(e.into()))?;
+        .map_err(|_| AppError::InternalServerError)?;
     let salt_key = format!("pow:salt:{}", pow_salt);
 
     // Atomic check and set to prevent race conditions (TOCTOU)
@@ -263,7 +263,7 @@ pub async fn get_paste(
         .pool
         .get()
         .await
-        .map_err(|e| AppError::InternalServerError(e.into()))?;
+        .map_err(|_| AppError::InternalServerError)?;
 
     let key = format!("paste:{}", id);
 
@@ -303,7 +303,7 @@ pub async fn delete_paste(
         .pool
         .get()
         .await
-        .map_err(|e| AppError::InternalServerError(e.into()))?;
+        .map_err(|_| AppError::InternalServerError)?;
 
     let key = format!("paste:{}", id);
 
