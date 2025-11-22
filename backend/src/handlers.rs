@@ -32,9 +32,9 @@ const POW_DIFFICULTY: usize = 4;
 
 pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeResponse> {
     let mut rng = rand::thread_rng();
-    let salt: String = (0..16)
-        .map(|_| format!("{:02x}", rng.gen::<u8>()))
-        .collect();
+    let mut salt_bytes = [0u8; 16];
+    rng.fill(&mut salt_bytes);
+    let salt = hex::encode(salt_bytes);
 
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -70,23 +70,22 @@ pub async fn create_paste(
     let pow_salt = headers
         .get("X-PoW-Salt")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+        .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Salt header".to_string()))?;
+
     let pow_nonce = headers
         .get("X-PoW-Nonce")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
+        .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Nonce header".to_string()))?;
+
     let pow_ts_str = headers
         .get("X-PoW-Timestamp")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("0");
+        .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Timestamp header".to_string()))?;
+
     let pow_sig = headers
         .get("X-PoW-Signature")
         .and_then(|v| v.to_str().ok())
-        .unwrap_or("");
-
-    if pow_salt.is_empty() || pow_nonce.is_empty() || pow_sig.is_empty() {
-        return Err(AppError::Unauthorized("Missing PoW headers".to_string()));
-    }
+        .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Signature header".to_string()))?;
 
     let mut con = state.client.get_multiplexed_async_connection().await?;
     let salt_key = format!("pow:salt:{}", pow_salt);
@@ -95,7 +94,10 @@ pub async fn create_paste(
         return Err(AppError::Unauthorized("PoW salt already used".to_string()));
     }
 
-    let pow_ts: u64 = pow_ts_str.parse().unwrap_or(0);
+    let pow_ts: u64 = pow_ts_str
+        .parse()
+        .map_err(|_| AppError::BadRequest("Invalid X-PoW-Timestamp".to_string()))?;
+
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()

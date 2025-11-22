@@ -31,11 +31,14 @@ async fn main() {
         hmac_secret,
     };
 
+    let frontend_url =
+        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+
     let cors = CorsLayer::new()
         .allow_origin(
-            "http://localhost:3000"
+            frontend_url
                 .parse::<axum::http::HeaderValue>()
-                .unwrap(),
+                .expect("Invalid FRONTEND_URL header value"),
         )
         .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
         .allow_headers(Any);
