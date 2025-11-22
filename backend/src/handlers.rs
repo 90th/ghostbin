@@ -90,7 +90,17 @@ pub async fn create_paste(
     let mut con = state.client.get_multiplexed_async_connection().await?;
     let salt_key = format!("pow:salt:{}", pow_salt);
 
-    if con.exists(&salt_key).await? {
+    // Atomic check and set to prevent race conditions (TOCTOU)
+    let set_result: Option<String> = redis::cmd("SET")
+        .arg(&salt_key)
+        .arg("used")
+        .arg("NX")
+        .arg("EX")
+        .arg(120)
+        .query_async(&mut con)
+        .await?;
+
+    if set_result.is_none() {
         return Err(AppError::Unauthorized("PoW salt already used".to_string()));
     }
 
@@ -117,7 +127,8 @@ pub async fn create_paste(
     mac.update(difficulty.to_string().as_bytes());
     mac.update(pow_ts.to_string().as_bytes());
 
-    if hex::encode(mac.finalize().into_bytes()) != pow_sig {
+    let expected_sig = hex::encode(mac.finalize().into_bytes());
+    if !constant_time_eq(expected_sig.as_bytes(), pow_sig.as_bytes()) {
         return Err(AppError::Unauthorized("Invalid PoW signature".to_string()));
     }
 
@@ -181,8 +192,6 @@ pub async fn create_paste(
     if final_ttl > MAX_TTL {
         final_ttl = MAX_TTL;
     }
-
-    let _: () = con.set_ex(&salt_key, "used", 120).await?;
 
     let result: Option<String> = redis::cmd("SET")
         .arg(&key)
