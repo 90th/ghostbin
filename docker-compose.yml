@@ -1,6 +1,6 @@
 services:
   redis:
-    image: redis:alpine
+    image: redis:7-alpine
     command: redis-server --save "" --appendonly no
     restart: always
     mem_swappiness: 0

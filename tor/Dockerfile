@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:3.21
 
 # Install Tor and su-exec (for dropping privileges)
 RUN apk add --no-cache tor su-exec
