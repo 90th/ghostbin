@@ -3,6 +3,7 @@ import { Lock, Flame, Code, Copy, ExternalLink, KeyRound, ChevronRight, Clock, D
 import { Button } from './Button';
 import { usePasteCreation } from '../hooks/usePasteCreation';
 import { cn } from '../lib/utils';
+import DOMPurify from 'dompurify';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
 import 'prismjs/components/prism-json';
@@ -98,22 +99,34 @@ export const CreatePaste: React.FC = () => {
   };
 
   const getHighlightedCode = () => {
+    let html = '';
     if (typeof Prism === 'undefined' || language === 'plaintext') {
-      return content
+      html = content
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    } else {
+      const grammar = Prism.languages[language];
+      if (!grammar) {
+        html = content
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      } else {
+        html = Prism.highlight(content, grammar, language);
+      }
     }
-    const grammar = Prism.languages[language];
-    if (!grammar) {
-      return content
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+
+    if (content.endsWith('\n')) {
+      html += '<br/>';
     }
-    return Prism.highlight(content, grammar, language);
+
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['span', 'code', 'pre', 'br', 'div'],
+      ALLOWED_ATTR: ['class', 'style', 'data-language']
+    });
   };
 
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
@@ -241,7 +254,7 @@ export const CreatePaste: React.FC = () => {
               background: 'transparent',
               boxShadow: 'none'
             }}
-            dangerouslySetInnerHTML={{ __html: getHighlightedCode() + (content.endsWith('\n') ? '<br/>' : '') }}
+            dangerouslySetInnerHTML={{ __html: getHighlightedCode() }}
           />
         </pre>
 
