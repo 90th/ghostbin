@@ -112,13 +112,6 @@ export const encryptText = async (text: string, key: CryptoKey): Promise<{ iv: s
   const encoder = new TextEncoder();
   const encodedData = encoder.encode(text);
 
-  // Compress data using Gzip
-  const stream = new CompressionStream('gzip');
-  const writer = stream.writable.getWriter();
-  writer.write(encodedData);
-  writer.close();
-  const compressedBuffer = await new Response(stream.readable).arrayBuffer();
-
   const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
   const encryptedBuffer = await window.crypto.subtle.encrypt(
@@ -127,7 +120,7 @@ export const encryptText = async (text: string, key: CryptoKey): Promise<{ iv: s
       iv: iv,
     },
     key,
-    compressedBuffer
+    encodedData
   );
 
   return {
@@ -150,15 +143,8 @@ export const decryptText = async (encryptedData: string, ivStr: string, key: Cry
     data
   );
 
-  // Decompress data using Gzip
-  const stream = new DecompressionStream('gzip');
-  const writer = stream.writable.getWriter();
-  writer.write(decryptedBuffer);
-  writer.close();
-  const decompressedBuffer = await new Response(stream.readable).arrayBuffer();
-
   const decoder = new TextDecoder();
-  return decoder.decode(decompressedBuffer);
+  return decoder.decode(decryptedBuffer);
 };
 
 // Helper for URL-safe Base64
