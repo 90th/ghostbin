@@ -62,6 +62,11 @@ uploads require a valid proof-of-work solution in the headers.
 - `GET /api/v1/paste/:id` - fetch encrypted payload
 - `DELETE /api/v1/paste/:id` - delete manually (requires burn token if active)
 
+## disclaimer
+I built this for fun and to learn.
+while the crypto is standard (aes-256 + argon2id), i'm just one dev and this hasn't been audited by a pro.
+there are still some bugs and rough edges i'm smoothing out.
+
 ## license
 mit.
 use it for whatever.
