@@ -15,15 +15,20 @@ export const hashToken = async (token: string): Promise<string> => {
  * Nothing leaves the browser unencrypted.
  */
 
-// Convert ArrayBuffer to Base64
-export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-  let binary = '';
-  const bytes = new Uint8Array(buffer);
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+// Convert ArrayBuffer to Base64 (Async using FileReader for performance)
+export const arrayBufferToBase64 = async (buffer: ArrayBuffer): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // data:application/octet-stream;base64,.....
+      const base64 = dataUrl.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 };
 
 // Convert Base64 to ArrayBuffer
@@ -124,8 +129,8 @@ export const encryptText = async (text: string, key: CryptoKey): Promise<{ iv: s
   );
 
   return {
-    iv: arrayBufferToBase64(iv.buffer),
-    data: arrayBufferToBase64(encryptedBuffer),
+    iv: await arrayBufferToBase64(iv.buffer),
+    data: await arrayBufferToBase64(encryptedBuffer),
   };
 };
 
@@ -163,7 +168,7 @@ const fromUrlSafeBase64 = (base64: string): string => {
 // Export key to Raw Base64 (URL-safe)
 export const exportKeyRaw = async (key: CryptoKey): Promise<string> => {
   const exported = await window.crypto.subtle.exportKey("raw", key);
-  const base64 = arrayBufferToBase64(exported);
+  const base64 = await arrayBufferToBase64(exported);
   return toUrlSafeBase64(base64);
 };
 
@@ -182,25 +187,4 @@ export const importKeyRaw = async (base64Key: string): Promise<CryptoKey> => {
   );
 };
 
-export const solvePoW = async (salt: string, difficulty: number): Promise<string> => {
-  const encoder = new TextEncoder();
-  let nonce = 0;
 
-  while (true) {
-    const nonceStr = nonce.toString();
-    const data = encoder.encode(salt + nonceStr);
-
-    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-    if (hashHex.startsWith('0'.repeat(difficulty))) {
-      return nonceStr;
-    }
-
-    nonce++;
-    if (nonce % 2000 === 0) {
-      await new Promise(resolve => setTimeout(resolve, 0));
-    }
-  }
-};

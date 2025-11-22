@@ -1,10 +1,8 @@
-import React, { useState, useRef, useLayoutEffect } from 'react';
+import React, { useRef, useLayoutEffect, useState } from 'react';
 import { Lock, Flame, Code, Copy, ExternalLink, KeyRound, ChevronRight, Clock, Dices, Eye, EyeOff, Check, Link } from 'lucide-react';
 import { Button } from './Button';
-import * as CryptoService from '../services/cryptoService';
-import * as StorageService from '../services/storageService';
-import { EncryptedPaste, CreatePastePayload } from '../types';
-import { v4 as uuidv4 } from 'uuid';
+import { usePasteCreation } from '../hooks/usePasteCreation';
+import { cn } from '../lib/utils';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
 import 'prismjs/components/prism-json';
@@ -40,15 +38,13 @@ const LANGUAGE_OPTIONS = [
   { label: 'C/C++', value: 'c' },
 ];
 
-// Shared styles to ensure perfect alignment between textarea and pre
-// We use 'pre' (no wrapping) to avoid browser inconsistencies with scrollbar widths
 const EDITOR_STYLES: React.CSSProperties = {
   fontFamily: '"JetBrains Mono", monospace',
   fontSize: '14px',
   fontWeight: 400,
   lineHeight: '24px',
   letterSpacing: '0px',
-  padding: '20px', // Reduced padding slightly for better fit
+  padding: '20px',
   tabSize: 4,
   whiteSpace: 'pre',
   overflowWrap: 'normal',
@@ -57,18 +53,24 @@ const EDITOR_STYLES: React.CSSProperties = {
 };
 
 export const CreatePaste: React.FC = () => {
-  const [content, setContent] = useState('');
-  const [password, setPassword] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [burnAfterRead, setBurnAfterRead] = useState(false);
-  const [expiration, setExpiration] = useState<number>(24 * 60 * 60 * 1000); // Default 1 Day
-  const [language, setLanguage] = useState<string>('plaintext');
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const {
+    content, setContent,
+    password, setPassword,
+    isProcessing,
+    burnAfterRead, setBurnAfterRead,
+    expiration, setExpiration,
+    language, setLanguage,
+    shareUrl,
+    error,
+    showPassword, setShowPassword,
+    handleEncrypt,
+    handleReset,
+    handleGeneratePassword
+  } = usePasteCreation();
+
   const [copied, setCopied] = useState(false);
   const [passwordCopied, setPasswordCopied] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [fontsLoaded, setFontsLoaded] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [receiptPasswordVisible, setReceiptPasswordVisible] = useState(false);
 
   const preRef = useRef<HTMLPreElement>(null);
@@ -78,99 +80,6 @@ export const CreatePaste: React.FC = () => {
       setFontsLoaded(true);
     });
   }, []);
-
-  const handleEncrypt = async () => {
-    if (!content.trim()) return;
-
-    setIsProcessing(true);
-    setError(null);
-    try {
-      // 0. Solve PoW Challenge
-      const challengeRes = await fetch('/api/v1/challenge');
-      if (!challengeRes.ok) throw new Error("Failed to get PoW challenge");
-      const challenge = await challengeRes.json();
-
-      const nonce = await CryptoService.solvePoW(challenge.salt, challenge.difficulty);
-
-      const powHeaders = {
-        'X-PoW-Salt': challenge.salt,
-        'X-PoW-Nonce': nonce,
-        'X-PoW-Timestamp': challenge.timestamp.toString(),
-        'X-PoW-Signature': challenge.signature
-      };
-
-      // 1. Generate Content Key
-      const contentKey = await CryptoService.generateKey();
-
-      // 1b. Generate Burn Token if needed
-      let burnToken: string | undefined;
-      let burnTokenHash: string | undefined;
-      if (burnAfterRead) {
-        burnToken = uuidv4();
-        burnTokenHash = await CryptoService.hashToken(burnToken);
-      }
-
-      // 2. Encrypt Content (Pack token inside)
-      const payloadToEncrypt = JSON.stringify({
-        text: content,
-        burnToken
-      });
-      const { iv: contentIv, data: encryptedContent } = await CryptoService.encryptText(payloadToEncrypt, contentKey);
-
-      // 3. Calculate Expiration
-      const expiresAt = expiration > 0 ? Date.now() + expiration : undefined;
-
-      // 4. Prepare payload
-      let payload: CreatePastePayload = {
-        iv: contentIv,
-        data: encryptedContent,
-        createdAt: Date.now(),
-        expiresAt,
-        burnAfterRead,
-        views: 0,
-        language,
-        hasPassword: false,
-        burnTokenHash
-      };
-
-      let keyParam = '';
-
-      if (password.trim()) {
-        const salt = CryptoService.generateSalt();
-        const wrapperKey = await CryptoService.deriveKeyFromPassword(password, salt);
-        const contentKeyString = await CryptoService.exportKey(contentKey);
-        const { iv: keyIv, data: encryptedKeyData } = await CryptoService.encryptText(contentKeyString, wrapperKey);
-
-        payload.hasPassword = true;
-        payload.salt = CryptoService.arrayBufferToBase64(salt.buffer as ArrayBuffer);
-        payload.encryptedKey = encryptedKeyData;
-        payload.keyIv = keyIv;
-        keyParam = '';
-      } else {
-        const keyString = await CryptoService.exportKeyRaw(contentKey);
-        keyParam = `&key=${keyString}`;
-      }
-
-      // Check payload size (1.5MB limit)
-      const payloadSize = new Blob([JSON.stringify(payload)]).size;
-      if (payloadSize > 1.5 * 1024 * 1024) {
-        throw new Error("Paste is too large (Limit: 1.5MB)");
-      }
-
-      const id = await StorageService.savePaste(payload, powHeaders);
-
-      const origin = window.location.origin;
-      const pathname = window.location.pathname || '/';
-      const url = `${origin}${pathname}#view/${id}${keyParam}`;
-      setShareUrl(url);
-
-    } catch (error) {
-      console.error("Encryption/Upload failed:", error);
-      setError("Failed to create paste. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const copyToClipboard = () => {
     if (shareUrl) {
@@ -188,33 +97,8 @@ export const CreatePaste: React.FC = () => {
     }
   };
 
-  const handleReset = () => {
-    setShareUrl(null);
-    setContent('');
-    setPassword('');
-    setBurnAfterRead(false);
-    setExpiration(24 * 60 * 60 * 1000);
-    setLanguage('plaintext');
-    setReceiptPasswordVisible(false);
-  };
-
-  const handleGeneratePassword = () => {
-    const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-    const length = 17;
-    const randomValues = new Uint32Array(length);
-    window.crypto.getRandomValues(randomValues);
-
-    let newPassword = "";
-    for (let i = 0; i < length; i++) {
-      newPassword += charset[randomValues[i] % charset.length];
-    }
-    setPassword(newPassword);
-    setShowPassword(true);
-  };
-
   const getHighlightedCode = () => {
     if (typeof Prism === 'undefined' || language === 'plaintext') {
-      // Manually escape html entities if not using Prism
       return content
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -244,8 +128,6 @@ export const CreatePaste: React.FC = () => {
 
     return (
       <div className="max-w-lg mx-auto mt-12 p-0 rounded-xl border border-white/10 bg-bg-surface shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-
-        {/* Header */}
         <div className="bg-brand-900/10 border-b border-white/5 p-6 text-center">
           <div className="w-12 h-12 bg-brand-500/20 rounded-full flex items-center justify-center mx-auto mb-3 border border-brand-500/30">
             <Check className="w-6 h-6 text-brand-400" />
@@ -254,7 +136,6 @@ export const CreatePaste: React.FC = () => {
         </div>
 
         <div className="p-6 space-y-6">
-          {/* Section 1: Link */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
               <Link className="w-3 h-3" /> Shareable Link (Onion)
@@ -273,7 +154,6 @@ export const CreatePaste: React.FC = () => {
             </div>
           </div>
 
-          {/* Section 2: Password (Conditional) */}
           {password && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -310,14 +190,13 @@ export const CreatePaste: React.FC = () => {
           )}
         </div>
 
-        {/* Section 3: Metadata Footer */}
         <div className="bg-bg-dark/50 border-t border-white/5 p-4 flex items-center justify-between text-xs font-mono text-gray-500">
           <div className="flex items-center gap-2">
             <Clock className="w-3 h-3" />
             <span>Expires: {expirationLabel}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Flame className={`w-3 h-3 ${burnAfterRead ? 'text-brand-500' : 'text-gray-600'}`} />
+            <Flame className={cn("w-3 h-3", burnAfterRead ? 'text-brand-500' : 'text-gray-600')} />
             <span>Burn: {burnAfterRead ? 'Yes' : 'No'}</span>
           </div>
         </div>
@@ -333,7 +212,6 @@ export const CreatePaste: React.FC = () => {
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] min-h-[500px] gap-4">
-      {/* Editor Area */}
       <div className="relative group flex-grow flex flex-col bg-bg-surface rounded-lg border border-white/5 overflow-hidden transition-colors hover:border-white/10">
 
         {!fontsLoaded && (
@@ -342,11 +220,10 @@ export const CreatePaste: React.FC = () => {
           </div>
         )}
 
-        {/* Syntax Highlighting Layer (Background) */}
         <pre
           ref={preRef}
           aria-hidden="true"
-          className={`absolute inset-0 w-full h-full m-0 overflow-hidden pointer-events-none select-none text-left ${!fontsLoaded ? 'opacity-0' : 'opacity-100'}`}
+          className={cn("absolute inset-0 w-full h-full m-0 overflow-hidden pointer-events-none select-none text-left", !fontsLoaded ? 'opacity-0' : 'opacity-100')}
           style={EDITOR_STYLES}
         >
           <code
@@ -358,7 +235,6 @@ export const CreatePaste: React.FC = () => {
               whiteSpace: 'inherit',
               display: 'inline-block',
               direction: 'ltr',
-              // Explicitly reset prism styles that might interfere
               padding: 0,
               margin: 0,
               border: 'none',
@@ -369,13 +245,12 @@ export const CreatePaste: React.FC = () => {
           />
         </pre>
 
-        {/* Transparent Editing Layer (Foreground) */}
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
           onScroll={handleScroll}
           placeholder="Type your secret message..."
-          className={`absolute inset-0 w-full h-full bg-transparent text-transparent caret-white resize-none focus:outline-none placeholder:text-gray-700 z-10 overflow-auto ${!fontsLoaded ? 'opacity-0' : 'opacity-100'}`}
+          className={cn("absolute inset-0 w-full h-full bg-transparent text-transparent caret-white resize-none focus:outline-none placeholder:text-gray-700 z-10 overflow-auto", !fontsLoaded ? 'opacity-0' : 'opacity-100')}
           style={EDITOR_STYLES}
           spellCheck={false}
           wrap="off"
@@ -390,7 +265,6 @@ export const CreatePaste: React.FC = () => {
         </div>
       </div>
 
-      {/* Compact Control Bar */}
       <div className="relative flex flex-col md:flex-row items-stretch md:items-center gap-3 bg-bg-surface p-2 rounded-lg border border-white/5">
 
         {error && (
@@ -399,10 +273,9 @@ export const CreatePaste: React.FC = () => {
           </div>
         )}
 
-        {/* Password Input */}
         <div className="relative flex-grow group min-w-[200px]">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <KeyRound className={`h-4 w-4 transition-colors ${password ? 'text-brand-500' : 'text-gray-600 group-hover:text-gray-500'}`} />
+            <KeyRound className={cn("h-4 w-4 transition-colors", password ? 'text-brand-500' : 'text-gray-600 group-hover:text-gray-500')} />
           </div>
           <input
             type={showPassword ? 'text' : 'password'}
@@ -431,10 +304,8 @@ export const CreatePaste: React.FC = () => {
           </div>
         </div>
 
-        {/* Options Divider (Hidden on mobile) */}
         <div className="hidden md:block w-px h-8 bg-white/5 mx-1"></div>
 
-        {/* Language Selector */}
         <div className="relative min-w-[140px]">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Code className="h-4 w-4 text-gray-600" />
@@ -455,7 +326,6 @@ export const CreatePaste: React.FC = () => {
           </div>
         </div>
 
-        {/* Expiration Selector */}
         <div className="relative min-w-[140px]">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Clock className="h-4 w-4 text-gray-600" />
@@ -471,13 +341,11 @@ export const CreatePaste: React.FC = () => {
               </option>
             ))}
           </select>
-          {/* Custom arrow for select */}
           <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
             <ChevronRight className="h-3 w-3 text-gray-600 rotate-90" />
           </div>
         </div>
 
-        {/* Burn Toggle */}
         <label className="flex items-center justify-center gap-2 cursor-pointer px-3 py-2 rounded hover:bg-bg-dark transition-colors select-none border border-transparent hover:border-white/5 whitespace-nowrap">
           <input
             type="checkbox"
@@ -485,13 +353,12 @@ export const CreatePaste: React.FC = () => {
             onChange={(e) => setBurnAfterRead(e.target.checked)}
             className="w-3 h-3 rounded-sm border-gray-600 bg-bg text-brand-600 focus:ring-brand-500/20 focus:ring-offset-0"
           />
-          <span className={`text-xs font-mono uppercase tracking-wide ${burnAfterRead ? 'text-brand-500' : 'text-gray-500'}`}>
+          <span className={cn("text-xs font-mono uppercase tracking-wide", burnAfterRead ? 'text-brand-500' : 'text-gray-500')}>
             Burn
           </span>
           {burnAfterRead && <Flame className="w-3 h-3 text-brand-500" />}
         </label>
 
-        {/* Action Button */}
         <Button
           onClick={handleEncrypt}
           disabled={!content.trim()}
