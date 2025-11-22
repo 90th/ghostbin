@@ -28,7 +28,7 @@ pub struct ChallengeResponse {
     pub signature: String,
 }
 
-const POW_DIFFICULTY: usize = 5;
+const POW_DIFFICULTY: usize = 4;
 
 pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeResponse> {
     let mut rng = rand::thread_rng();

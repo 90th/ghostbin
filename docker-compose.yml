@@ -3,6 +3,9 @@ services:
     image: redis:alpine
     command: redis-server --save "" --appendonly no
     restart: always
+    mem_swappiness: 0
+    ulimits:
+      memlock: -1
     networks:
       - ghostbin-net
     # No ports exposed to host for security
