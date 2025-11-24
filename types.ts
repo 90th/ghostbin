@@ -6,7 +6,6 @@ export interface EncryptedPaste {
   expiresAt?: number; // Timestamp when the paste expires
   burnAfterRead: boolean;
   views: number;
-  language?: string;
 
   // Password protection fields
   hasPassword?: boolean;
@@ -32,7 +31,6 @@ export interface DecryptedPaste {
 export interface PasteMetadata {
   ttl: number; // Time to live in hours
   burnAfterRead: boolean;
-  language: string;
 }
 
 export enum AppRoute {

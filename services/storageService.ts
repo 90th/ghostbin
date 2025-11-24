@@ -6,7 +6,6 @@ export interface PasteMetadata {
   exists: boolean;
   hasPassword: boolean;
   burnAfterRead: boolean;
-  language: string;
   createdAt: number;
   expiresAt: number | null;
 }
