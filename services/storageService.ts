@@ -2,6 +2,15 @@ import { EncryptedPaste, CreatePastePayload } from '../types';
 
 const API_BASE = '/api/v1';
 
+export interface PasteMetadata {
+  exists: boolean;
+  hasPassword: boolean;
+  burnAfterRead: boolean;
+  language: string;
+  createdAt: number;
+  expiresAt: number | null;
+}
+
 export const savePaste = async (paste: CreatePastePayload, headers?: Record<string, string>): Promise<string> => {
   const response = await fetch(`${API_BASE}/paste`, {
     method: 'POST',
@@ -63,4 +72,14 @@ export const deletePaste = async (id: string, burnToken?: string): Promise<void>
   if (!response.ok) {
     console.error(`Failed to delete paste ${id}: ${response.status}`);
   }
+};
+
+export const getPasteMetadata = async (id: string): Promise<PasteMetadata | null> => {
+  const response = await fetch(`${API_BASE}/paste/${id}/metadata`);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return response.json();
 };

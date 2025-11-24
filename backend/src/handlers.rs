@@ -22,6 +22,7 @@ pub struct AppState {
     pub pool: Pool,
     pub hmac_secret: [u8; 32],
     pub read_limiter: Arc<Semaphore>,
+    pub challenge_limiter: Arc<Semaphore>,
 }
 
 #[derive(Serialize)]
@@ -32,9 +33,27 @@ pub struct ChallengeResponse {
     pub signature: String,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PasteMetadata {
+    pub exists: bool,
+    pub has_password: bool,
+    pub burn_after_read: bool,
+    pub language: String,
+    pub created_at: i64,
+    pub expires_at: Option<i64>,
+}
+
 const POW_DIFFICULTY: usize = 4;
 
-pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeResponse> {
+pub async fn get_challenge(
+    State(state): State<AppState>,
+) -> Result<Json<ChallengeResponse>, AppError> {
+    let _permit = state
+        .challenge_limiter
+        .try_acquire()
+        .map_err(|_| AppError::TooManyRequests)?;
+
     let mut rng = rand::thread_rng();
     let mut salt_bytes = [0u8; 16];
     rng.fill(&mut salt_bytes);
@@ -57,12 +76,48 @@ pub async fn get_challenge(State(state): State<AppState>) -> Json<ChallengeRespo
     let result = mac.finalize();
     let signature = hex::encode(result.into_bytes());
 
-    Json(ChallengeResponse {
+    Ok(Json(ChallengeResponse {
         salt,
         difficulty,
         timestamp,
         signature,
-    })
+    }))
+}
+
+pub async fn get_paste_metadata(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<PasteMetadata>, AppError> {
+    let mut con = state
+        .pool
+        .get()
+        .await
+        .map_err(|_| AppError::InternalServerError)?;
+
+    let key = format!("paste:{}", id);
+    let json: Option<String> = con.get(&key).await?;
+
+    match json {
+        Some(j) => {
+            let paste: Paste = serde_json::from_str(&j)?;
+            Ok(Json(PasteMetadata {
+                exists: true,
+                has_password: paste.has_password,
+                burn_after_read: paste.burn_after_read,
+                language: paste.language,
+                created_at: paste.created_at,
+                expires_at: paste.expires_at,
+            }))
+        }
+        None => Ok(Json(PasteMetadata {
+            exists: false,
+            has_password: false,
+            burn_after_read: false,
+            language: String::new(),
+            created_at: 0,
+            expires_at: None,
+        })),
+    }
 }
 
 async fn verify_proof_of_work(state: &AppState, headers: &HeaderMap) -> Result<(), AppError> {

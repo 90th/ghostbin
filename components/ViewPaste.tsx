@@ -34,21 +34,30 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
   useEffect(() => {
     const fetchPaste = async () => {
       try {
+        // fetch metadata first to check if password is required without downloading full payload
+        const metadata = await StorageService.getPasteMetadata(pasteId);
+        if (!metadata || !metadata.exists) {
+          throw new Error("Paste not found, expired, or burned.");
+        }
+
+        // if password required, prompt user before fetching full encrypted content
+        if (metadata.hasPassword) {
+          setStatus('password_required');
+          return;
+        }
+
+        // no password needed, fetch full paste and decrypt
+        if (!decryptionKey) {
+          throw new Error("Decryption key missing.");
+        }
+
         const encryptedData = await StorageService.getPaste(pasteId);
         if (!encryptedData) {
           throw new Error("Paste not found, expired, or burned.");
         }
 
         setPasteData(encryptedData);
-
-        if (encryptedData.hasPassword) {
-          setStatus('password_required');
-        } else {
-          if (!decryptionKey) {
-            throw new Error("Decryption key missing.");
-          }
-          decryptContent(encryptedData, decryptionKey);
-        }
+        decryptContent(encryptedData, decryptionKey);
 
       } catch (err: any) {
         console.error(err);
@@ -129,10 +138,24 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
     }
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pasteData) return;
-    decryptContent(pasteData, passwordInput, true);
+    setStatus('loading');
+    setErrorMsg('');
+
+    try {
+      // fetch full paste only after password is provided
+      const encryptedData = await StorageService.getPaste(pasteId);
+      if (!encryptedData) {
+        throw new Error("Paste not found, expired, or burned.");
+      }
+
+      setPasteData(encryptedData);
+      decryptContent(encryptedData, passwordInput, true);
+    } catch (err: any) {
+      setStatus('password_required');
+      setErrorMsg(err.message || "Failed to load paste.");
+    }
   };
 
   const handleCopy = () => {

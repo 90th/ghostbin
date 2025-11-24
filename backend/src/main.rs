@@ -19,6 +19,7 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 const MAX_CONCURRENT_READS: usize = 50;
+const MAX_CONCURRENT_CHALLENGES: usize = 100;
 
 #[tokio::main]
 async fn main() {
@@ -31,11 +32,13 @@ async fn main() {
     let hmac_secret: [u8; 32] = rng.gen();
 
     let read_limiter = Arc::new(Semaphore::new(MAX_CONCURRENT_READS));
+    let challenge_limiter = Arc::new(Semaphore::new(MAX_CONCURRENT_CHALLENGES));
 
     let state = AppState {
         pool,
         hmac_secret,
         read_limiter,
+        challenge_limiter,
     };
 
     let frontend_url =
@@ -56,6 +59,10 @@ async fn main() {
         .route(
             "/api/v1/paste/:id",
             get(handlers::get_paste).delete(handlers::delete_paste),
+        )
+        .route(
+            "/api/v1/paste/:id/metadata",
+            get(handlers::get_paste_metadata),
         )
         .layer(DefaultBodyLimit::max(1024 * 1024 + 512 * 1024)) // 1.5MB limit
         .layer(cors)
