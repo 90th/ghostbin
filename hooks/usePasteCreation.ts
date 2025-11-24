@@ -84,9 +84,10 @@ export const usePasteCreation = () => {
                 burnTokenHash = await CryptoService.hashToken(burnToken);
             }
 
-            // 2. Encrypt Content (Pack token inside)
+            // 2. Encrypt Content (pack language inside to prevent metadata leakage)
             const payloadToEncrypt = JSON.stringify({
                 text: content,
+                language,
                 burnToken
             });
             const { iv: contentIv, data: encryptedContent } = await CryptoService.encryptText(payloadToEncrypt, contentKey);
@@ -94,7 +95,7 @@ export const usePasteCreation = () => {
             // 3. Calculate Expiration
             const expiresAt = expiration > 0 ? Date.now() + expiration : undefined;
 
-            // 4. Prepare payload
+            // 4. Prepare payload (language is now inside ciphertext, not exposed to server)
             let payload: CreatePastePayload = {
                 iv: contentIv,
                 data: encryptedContent,
@@ -102,7 +103,6 @@ export const usePasteCreation = () => {
                 expiresAt,
                 burnAfterRead,
                 views: 0,
-                language,
                 hasPassword: false,
                 burnTokenHash
             };

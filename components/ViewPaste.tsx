@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Unlock, AlertTriangle, Copy, Check, KeyRound, Eye, Calendar, Clock, Code } from 'lucide-react';
+import { Unlock, AlertTriangle, Copy, Check, KeyRound, Eye, Calendar, Clock, Code, Lock } from 'lucide-react';
 import { Button } from './Button';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
 import { DecryptedPaste, EncryptedPaste } from '../types';
+import { isValidLanguage } from '../lib/constants';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
 import 'prismjs/components/prism-json';
@@ -95,18 +96,23 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
 
       const rawDecrypted = await CryptoService.decryptText(data.data, data.iv, contentKey);
 
-      // Parse payload to extract text and potential burn token
+      // parse payload to extract text, language, and burn token
       let text = rawDecrypted;
       let burnToken: string | undefined;
+      let language: string = 'plaintext';
 
       try {
         const payload = JSON.parse(rawDecrypted);
         if (payload && typeof payload === 'object' && 'text' in payload) {
           text = payload.text;
           burnToken = payload.burnToken;
+          // validate language against allowlist to prevent dom injection via class name
+          if (payload.language && isValidLanguage(payload.language)) {
+            language = payload.language;
+          }
         }
       } catch (e) {
-        // Legacy paste or plain text, keep as is
+        // legacy paste or plain text, keep defaults
       }
 
       setDecryptedPaste({
@@ -116,7 +122,7 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
         burnAfterRead: data.burnAfterRead,
         views: data.views,
         expiresAt: data.expiresAt,
-        language: data.language,
+        language,
         burnToken
       });
       setStatus('success');
@@ -275,6 +281,7 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
             <div>
               <div className="text-[10px] font-mono text-gray-600 uppercase">Language</div>
               <div className="text-xs text-gray-400 capitalize">
+                {/* language is now decrypted from payload, not server metadata */}
                 {decryptedPaste?.language || 'Plain Text'}
               </div>
             </div>
