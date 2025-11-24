@@ -57,9 +57,10 @@ minimal endpoints.
 encryption happens client-side, so don't send raw text here.
 uploads require a valid proof-of-work solution in the headers.
 
-- `GET /api/v1/challenge` - request a pow challenge (returns salt + difficulty + signature)
+- `GET /api/v1/challenge` - request a pow challenge (returns salt + difficulty + signature). rate-limited.
 - `POST /api/v1/paste` - upload encrypted payload. requires `X-PoW-*` headers. returns assigned `{id: "..."}`
 - `GET /api/v1/paste/:id` - fetch encrypted payload
+- `GET /api/v1/paste/:id/metadata` - lightweight check for paste existence and properties
 - `DELETE /api/v1/paste/:id` - delete manually (requires burn token if active)
 
 ## disclaimer
