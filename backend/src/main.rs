@@ -65,6 +65,10 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     println!("Listening on {}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("failed to bind listener — is port 8080 in use?");
+    axum::serve(listener, app)
+        .await
+        .expect("server terminated unexpectedly");
 }

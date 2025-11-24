@@ -156,6 +156,11 @@ pub async fn create_paste(
 ) -> Result<(StatusCode, Json<CreatePasteResponse>), AppError> {
     verify_proof_of_work(&state, &headers).await?;
 
+    // validating ciphertext isn't empty
+    if req.data.is_empty() {
+        return Err(AppError::BadRequest("Data cannot be empty".to_string()));
+    }
+
     // Input Validation
     if req.language.len() > 20
         || !req
