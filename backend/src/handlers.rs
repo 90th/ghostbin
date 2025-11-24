@@ -39,7 +39,6 @@ pub struct PasteMetadata {
     pub exists: bool,
     pub has_password: bool,
     pub burn_after_read: bool,
-    pub language: String,
     pub created_at: i64,
     pub expires_at: Option<i64>,
 }
@@ -104,7 +103,6 @@ pub async fn get_paste_metadata(
                 exists: true,
                 has_password: paste.has_password,
                 burn_after_read: paste.burn_after_read,
-                language: paste.language,
                 created_at: paste.created_at,
                 expires_at: paste.expires_at,
             }))
@@ -113,7 +111,6 @@ pub async fn get_paste_metadata(
             exists: false,
             has_password: false,
             burn_after_read: false,
-            language: String::new(),
             created_at: 0,
             expires_at: None,
         })),
@@ -216,16 +213,6 @@ pub async fn create_paste(
         return Err(AppError::BadRequest("Data cannot be empty".to_string()));
     }
 
-    // Input Validation
-    if req.language.len() > 20
-        || !req
-            .language
-            .chars()
-            .all(|c| c.is_alphanumeric() || c == '+' || c == '-' || c == '#' || c == '_')
-    {
-        return Err(AppError::BadRequest("Invalid language".to_string()));
-    }
-
     if req.iv.len() > 512 {
         return Err(AppError::BadRequest("IV too long".to_string()));
     }
@@ -264,7 +251,6 @@ pub async fn create_paste(
         expires_at: req.expires_at,
         burn_after_read: req.burn_after_read,
         views: req.views,
-        language: req.language,
         has_password: req.has_password,
         salt: req.salt,
         encrypted_key: req.encrypted_key,
