@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Unlock, AlertTriangle, Copy, Check, KeyRound, Eye, Calendar, Clock, Code, Lock } from 'lucide-react';
+import { Unlock, AlertTriangle, Check, KeyRound, Eye, Calendar, Clock, Code, Lock, FileText } from 'lucide-react';
 import { Button } from './Button';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
@@ -29,7 +29,7 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
   const [decryptedPaste, setDecryptedPaste] = useState<DecryptedPaste | null>(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const [copied, setCopied] = useState(false);
+  const [rawCopied, setRawCopied] = useState(false);
   const codeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -164,14 +164,13 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
     }
   };
 
-  const handleCopy = () => {
+  const handleCopyRaw = () => {
     if (decryptedPaste) {
       navigator.clipboard.writeText(decryptedPaste.text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setRawCopied(true);
+      setTimeout(() => setRawCopied(false), 2000);
     }
   };
-
   const formatDate = (ts: number) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -248,14 +247,16 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
             </div>
           </div>
 
-          <Button
-            variant="ghost"
-            onClick={handleCopy}
-            className="text-xs h-8 border border-white/5 bg-bg-surface hover:bg-white/5"
-          >
-            {copied ? <Check className="w-3 h-3 mr-2 text-green-400" /> : <Copy className="w-3 h-3 mr-2" />}
-            {copied ? 'Copied' : 'Copy Text'}
-          </Button>
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              onClick={handleCopyRaw}
+              className="text-xs h-8 border border-white/5 bg-bg-surface hover:bg-white/5"
+            >
+              {rawCopied ? <Check className="w-3 h-3 mr-2 text-green-400" /> : <FileText className="w-3 h-3 mr-2" />}
+              {rawCopied ? 'Copied' : 'Copy Raw'}
+            </Button>
+          </div>
         </div>
 
         {/* Metadata Grid */}
@@ -281,7 +282,6 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
             <div>
               <div className="text-[10px] font-mono text-gray-600 uppercase">Language</div>
               <div className="text-xs text-gray-400 capitalize">
-                {/* language is now decrypted from payload, not server metadata */}
                 {decryptedPaste?.language || 'Plain Text'}
               </div>
             </div>
