@@ -112,7 +112,6 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
           }
         }
       } catch (e) {
-        // legacy paste or plain text, keep defaults
       }
 
       setDecryptedPaste({
