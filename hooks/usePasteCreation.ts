@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
+import { arrayBufferToBase64 } from '../lib/encoding';
 import { CreatePastePayload } from '../types';
 
 interface UsePasteCreationProps {
@@ -123,7 +124,7 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
                 const { iv: keyIv, data: encryptedKeyData } = await CryptoService.encryptText(contentKeyString, wrapperKey);
 
                 payload.hasPassword = true;
-                payload.salt = await CryptoService.arrayBufferToBase64(salt.buffer as ArrayBuffer);
+                payload.salt = await arrayBufferToBase64(salt.buffer as ArrayBuffer);
                 payload.encryptedKey = encryptedKeyData;
                 payload.keyIv = keyIv;
                 keyParam = '';

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
+import { base64ToArrayBuffer } from '../lib/encoding';
 import { DecryptedPaste, EncryptedPaste } from '../types';
 import { isValidLanguage } from '../lib/constants';
 
@@ -21,7 +22,7 @@ export const usePasteViewer = (pasteId: string, decryptionKey: string | null) =>
         if (!data.salt || !data.encryptedKey || !data.keyIv) {
           throw new Error("Corrupt password data.");
         }
-        const salt = new Uint8Array(CryptoService.base64ToArrayBuffer(data.salt));
+        const salt = new Uint8Array(base64ToArrayBuffer(data.salt));
         const wrapperKey = await CryptoService.deriveKeyFromPassword(keyString, salt);
         const decryptedKeyJson = await CryptoService.decryptText(data.encryptedKey, data.keyIv, wrapperKey);
         contentKey = await CryptoService.importKey(decryptedKeyJson);

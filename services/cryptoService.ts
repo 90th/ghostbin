@@ -1,6 +1,26 @@
 import { argon2id } from 'hash-wasm';
+import {
+  arrayBufferToBase64,
+  base64ToArrayBuffer,
+  hexToUint8Array,
+  toUrlSafeBase64,
+  fromUrlSafeBase64
+} from '../lib/encoding';
 
-// SHA-256 Hash function for Burn Token
+/**
+ * Client-side encryption service using Web Crypto API.
+ * Nothing leaves the browser unencrypted.
+ */
+
+// ============================================================================
+// Hashing
+// ============================================================================
+
+/**
+ * SHA-256 Hash function for Burn Token
+ * @param token The token string to hash
+ * @returns Hex string of the hash
+ */
 export const hashToken = async (token: string): Promise<string> => {
   const encoder = new TextEncoder();
   const data = encoder.encode(token);
@@ -10,39 +30,14 @@ export const hashToken = async (token: string): Promise<string> => {
   return hashHex;
 };
 
+// ============================================================================
+// Key Management
+// ============================================================================
+
 /**
- * Client-side encryption service using Web Crypto API.
- * Nothing leaves the browser unencrypted.
+ * Generate a new AES-GCM key
+ * Security: AES-GCM 256-bit
  */
-
-// Convert ArrayBuffer to Base64 (Async using FileReader for performance)
-export const arrayBufferToBase64 = async (buffer: ArrayBuffer): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const blob = new Blob([buffer], { type: 'application/octet-stream' });
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      // data:application/octet-stream;base64,.....
-      const base64 = dataUrl.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
-
-// Convert Base64 to ArrayBuffer
-export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes.buffer;
-};
-
-// Generate a new AES-GCM key
 export const generateKey = async (): Promise<CryptoKey> => {
   return window.crypto.subtle.generateKey(
     {
@@ -54,22 +49,18 @@ export const generateKey = async (): Promise<CryptoKey> => {
   );
 };
 
-// Generate a random salt
+/**
+ * Generate a random salt
+ * Security: 16 bytes (128 bits) of cryptographically strong random data
+ */
 export const generateSalt = (): Uint8Array => {
   return window.crypto.getRandomValues(new Uint8Array(16));
 };
 
-// Helper to convert Hex string to Uint8Array
-const hexToUint8Array = (hex: string): Uint8Array => {
-  const len = hex.length;
-  const bytes = new Uint8Array(len / 2);
-  for (let i = 0; i < len; i += 2) {
-    bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
-  }
-  return bytes;
-};
-
-// Derive a key from a password using Argon2id
+/**
+ * Derive a key from a password using Argon2id
+ * Security: Argon2id, 1 iteration, 64MB memory, 1 parallelism, 32 byte hash
+ */
 export const deriveKeyFromPassword = async (password: string, salt: Uint8Array): Promise<CryptoKey> => {
   const derivedKeyHex = await argon2id({
     password,
@@ -92,13 +83,17 @@ export const deriveKeyFromPassword = async (password: string, salt: Uint8Array):
   );
 };
 
-// Export key to JWK (for URL fragment or storage)
+/**
+ * Export key to JWK (for URL fragment or storage)
+ */
 export const exportKey = async (key: CryptoKey): Promise<string> => {
   const exported = await window.crypto.subtle.exportKey("jwk", key);
   return JSON.stringify(exported);
 };
 
-// Import key from JWK string
+/**
+ * Import key from JWK string
+ */
 export const importKey = async (jwkString: string): Promise<CryptoKey> => {
   const jwk = JSON.parse(jwkString);
   return window.crypto.subtle.importKey(
@@ -112,7 +107,40 @@ export const importKey = async (jwkString: string): Promise<CryptoKey> => {
   );
 };
 
-// Encrypt text (or serialized key data)
+/**
+ * Export key to Raw Base64 (URL-safe)
+ */
+export const exportKeyRaw = async (key: CryptoKey): Promise<string> => {
+  const exported = await window.crypto.subtle.exportKey("raw", key);
+  const base64 = await arrayBufferToBase64(exported);
+  return toUrlSafeBase64(base64);
+};
+
+/**
+ * Import key from Raw Base64 string (URL-safe)
+ */
+export const importKeyRaw = async (base64Key: string): Promise<CryptoKey> => {
+  const base64 = fromUrlSafeBase64(base64Key);
+  const buffer = base64ToArrayBuffer(base64);
+  return window.crypto.subtle.importKey(
+    "raw",
+    buffer,
+    {
+      name: "AES-GCM",
+    },
+    true,
+    ["encrypt", "decrypt"]
+  );
+};
+
+// ============================================================================
+// Encryption / Decryption
+// ============================================================================
+
+/**
+ * Encrypt text (or serialized key data)
+ * Security: AES-GCM with random 12-byte IV
+ */
 export const encryptText = async (text: string, key: CryptoKey): Promise<{ iv: string; data: string }> => {
   const encoder = new TextEncoder();
   const encodedData = encoder.encode(text);
@@ -134,7 +162,10 @@ export const encryptText = async (text: string, key: CryptoKey): Promise<{ iv: s
   };
 };
 
-// Decrypt text (or serialized key data)
+/**
+ * Decrypt text (or serialized key data)
+ * Security: AES-GCM
+ */
 export const decryptText = async (encryptedData: string, ivStr: string, key: CryptoKey): Promise<string> => {
   const iv = base64ToArrayBuffer(ivStr);
   const data = base64ToArrayBuffer(encryptedData);
@@ -150,41 +181,6 @@ export const decryptText = async (encryptedData: string, ivStr: string, key: Cry
 
   const decoder = new TextDecoder();
   return decoder.decode(decryptedBuffer);
-};
-
-// Helper for URL-safe Base64
-const toUrlSafeBase64 = (base64: string): string => {
-  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-};
-
-const fromUrlSafeBase64 = (base64: string): string => {
-  let str = base64.replace(/-/g, '+').replace(/_/g, '/');
-  while (str.length % 4) {
-    str += '=';
-  }
-  return str;
-};
-
-// Export key to Raw Base64 (URL-safe)
-export const exportKeyRaw = async (key: CryptoKey): Promise<string> => {
-  const exported = await window.crypto.subtle.exportKey("raw", key);
-  const base64 = await arrayBufferToBase64(exported);
-  return toUrlSafeBase64(base64);
-};
-
-// Import key from Raw Base64 string (URL-safe)
-export const importKeyRaw = async (base64Key: string): Promise<CryptoKey> => {
-  const base64 = fromUrlSafeBase64(base64Key);
-  const buffer = base64ToArrayBuffer(base64);
-  return window.crypto.subtle.importKey(
-    "raw",
-    buffer,
-    {
-      name: "AES-GCM",
-    },
-    true,
-    ["encrypt", "decrypt"]
-  );
 };
 
 
