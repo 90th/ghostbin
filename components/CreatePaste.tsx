@@ -38,7 +38,14 @@ const EDITOR_STYLES: React.CSSProperties = {
   fontVariantLigatures: 'none',
 };
 
-export const CreatePaste: React.FC = () => {
+interface CreatePasteProps {
+  initialData?: {
+    content: string;
+    language: string;
+  } | null;
+}
+
+export const CreatePaste: React.FC<CreatePasteProps> = ({ initialData }) => {
   const {
     content, setContent,
     password, setPassword,
@@ -52,7 +59,7 @@ export const CreatePaste: React.FC = () => {
     handleEncrypt,
     handleReset,
     handleGeneratePassword
-  } = usePasteCreation();
+  } = usePasteCreation({ initialData });
 
   const [copied, setCopied] = useState(false);
   const [passwordCopied, setPasswordCopied] = useState(false);
@@ -130,7 +137,6 @@ export const CreatePaste: React.FC = () => {
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set to false if we are leaving the drop zone entirely
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setIsDragging(false);
   }, []);
@@ -149,7 +155,6 @@ export const CreatePaste: React.FC = () => {
           setContent(text);
         }
       };
-      // Basic error handling for binary/unreadable files
       try {
         reader.readAsText(file);
       } catch (err) {

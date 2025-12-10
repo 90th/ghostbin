@@ -8,6 +8,7 @@ const App: React.FC = () => {
   const [route, setRoute] = useState<'create' | 'view' | 'about'>('create');
   const [viewParams, setViewParams] = useState<{ id: string; key: string | null } | null>(null);
   const [createKey, setCreateKey] = useState(0);
+  const [forkData, setForkData] = useState<{ content: string; language: string } | null>(null);
 
   // Safe hash parsing that won't crash if location is restricted
   const parseHash = useCallback(() => {
@@ -44,6 +45,7 @@ const App: React.FC = () => {
     if (dest === 'create') {
       setRoute('create');
       setViewParams(null);
+      setForkData(null);
       setCreateKey(prev => prev + 1);
       // Attempt to clear URL hash, but gracefully fail if blocked by sandbox
       try {
@@ -65,12 +67,25 @@ const App: React.FC = () => {
       }
     }
   }, []);
+  const handleFork = useCallback((content: string, language: string) => {
+    setForkData({ content, language });
+    setRoute('create');
+    setViewParams(null);
+    setCreateKey(prev => prev + 1);
+    try {
+      if (window.location.hash !== '') {
+        window.location.hash = '';
+      }
+    } catch (e) {
+      console.warn('Navigation hash update blocked:', e);
+    }
+  }, []);
 
   return (
     <Layout onNavigate={handleNavigate}>
       {route === 'create' && (
         <div className="max-w-4xl mx-auto">
-          <CreatePaste key={createKey} />
+          <CreatePaste key={createKey} initialData={forkData} />
         </div>
       )}
 
@@ -80,6 +95,7 @@ const App: React.FC = () => {
             pasteId={viewParams.id}
             decryptionKey={viewParams.key}
             onBack={() => handleNavigate('create')}
+            onFork={handleFork}
           />
         </div>
       )}

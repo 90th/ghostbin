@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Unlock, AlertTriangle, Check, KeyRound, Eye, Calendar, Clock, Code, Lock, FileText } from 'lucide-react';
+import { Unlock, AlertTriangle, Check, KeyRound, Eye, Calendar, Clock, Code, Lock, FileText, GitFork } from 'lucide-react';
 import { Button } from './Button';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
@@ -21,9 +21,10 @@ interface ViewPasteProps {
   pasteId: string;
   decryptionKey: string | null;
   onBack: () => void;
+  onFork: (content: string, language: string) => void;
 }
 
-export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, onBack }) => {
+export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, onBack, onFork }) => {
   const [status, setStatus] = useState<'loading' | 'error' | 'password_required' | 'decrypting' | 'success'>('loading');
   const [pasteData, setPasteData] = useState<EncryptedPaste | null>(null);
   const [decryptedPaste, setDecryptedPaste] = useState<DecryptedPaste | null>(null);
@@ -162,7 +163,6 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
       setErrorMsg(err.message || "Failed to load paste.");
     }
   };
-
   const handleCopyRaw = () => {
     if (decryptedPaste) {
       navigator.clipboard.writeText(decryptedPaste.text);
@@ -170,6 +170,13 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
       setTimeout(() => setRawCopied(false), 2000);
     }
   };
+
+  const handleFork = () => {
+    if (decryptedPaste) {
+      onFork(decryptedPaste.text, decryptedPaste.language);
+    }
+  };
+
   const formatDate = (ts: number) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -241,12 +248,21 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
               <Unlock className="w-5 h-5 text-brand-600" />
             </div>
             <div>
-              <div className="text-[10px] font-mono text-gray-500 uppercase tracking-wider mb-0.5">Paste ID</div>
-              <div className="text-base font-mono text-white font-bold tracking-wide">{decryptedPaste?.id.substring(0, 8)}</div>
+              <h1 className="text-lg font-bold text-white">Decrypted Payload</h1>
+              <div className="text-xs text-gray-500 font-mono">
+                {decryptedPaste?.text.length.toLocaleString()} bytes
+              </div>
             </div>
           </div>
-
           <div className="flex items-center">
+            <Button
+              variant="ghost"
+              onClick={handleFork}
+              className="text-xs h-8 border border-white/5 bg-bg-surface hover:bg-white/5 mr-2"
+            >
+              <GitFork className="w-3 h-3 mr-2" />
+              Fork
+            </Button>
             <Button
               variant="ghost"
               onClick={handleCopyRaw}

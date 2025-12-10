@@ -4,13 +4,20 @@ import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
 import { CreatePastePayload } from '../types';
 
-export const usePasteCreation = () => {
-    const [content, setContent] = useState('');
+interface UsePasteCreationProps {
+    initialData?: {
+        content: string;
+        language: string;
+    } | null;
+}
+
+export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) => {
+    const [content, setContent] = useState(initialData?.content || '');
     const [password, setPassword] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
     const [burnAfterRead, setBurnAfterRead] = useState(false);
     const [expiration, setExpiration] = useState<number>(24 * 60 * 60 * 1000); // Default 1 Day
-    const [language, setLanguage] = useState<string>('plaintext');
+    const [language, setLanguage] = useState<string>(initialData?.language || 'plaintext');
     const [shareUrl, setShareUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
