@@ -2,6 +2,7 @@ mod db;
 mod error;
 mod handlers;
 mod model;
+mod repository;
 
 use axum::{
     extract::DefaultBodyLimit,
@@ -12,6 +13,7 @@ use axum::{
 use dotenvy::dotenv;
 use handlers::AppState;
 use rand::Rng;
+use repository::PasteRepository;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -27,6 +29,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let pool = db::create_pool().expect("Failed to create Redis pool");
+    let repository = PasteRepository::new(pool);
 
     let mut rng = rand::thread_rng();
     let hmac_secret: [u8; 32] = rng.gen();
@@ -35,7 +38,7 @@ async fn main() {
     let challenge_limiter = Arc::new(Semaphore::new(MAX_CONCURRENT_CHALLENGES));
 
     let state = AppState {
-        pool,
+        repository,
         hmac_secret,
         read_limiter,
         challenge_limiter,

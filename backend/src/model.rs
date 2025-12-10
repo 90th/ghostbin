@@ -37,3 +37,35 @@ pub struct CreatePasteRequest {
 pub struct CreatePasteResponse {
     pub id: String,
 }
+
+impl CreatePasteRequest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.data.is_empty() {
+            return Err("Data cannot be empty".to_string());
+        }
+
+        if self.iv.len() > 512 {
+            return Err("IV too long".to_string());
+        }
+
+        if let Some(ref salt) = self.salt {
+            if salt.len() > 512 {
+                return Err("Salt too long".to_string());
+            }
+        }
+
+        if let Some(ref key) = self.encrypted_key {
+            if key.len() > 512 {
+                return Err("Encrypted key too long".to_string());
+            }
+        }
+
+        if let Some(ref iv) = self.key_iv {
+            if iv.len() > 512 {
+                return Err("Key IV too long".to_string());
+            }
+        }
+
+        Ok(())
+    }
+}

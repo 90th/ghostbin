@@ -1,13 +1,12 @@
 use crate::error::AppError;
 use crate::model::{CreatePasteRequest, CreatePasteResponse, Paste};
+use crate::repository::PasteRepository;
 use axum::{
     extract::{Path, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
 use constant_time_eq::constant_time_eq;
-use deadpool_redis::redis::AsyncCommands;
-use deadpool_redis::Pool;
 use hmac::{Hmac, Mac};
 use rand::Rng;
 use serde::Serialize;
@@ -19,7 +18,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub pool: Pool,
+    pub repository: PasteRepository,
     pub hmac_secret: [u8; 32],
     pub read_limiter: Arc<Semaphore>,
     pub challenge_limiter: Arc<Semaphore>,
@@ -87,26 +86,16 @@ pub async fn get_paste_metadata(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<PasteMetadata>, AppError> {
-    let mut con = state
-        .pool
-        .get()
-        .await
-        .map_err(|_| AppError::InternalServerError)?;
+    let paste = state.repository.get_paste(&id).await?;
 
-    let key = format!("paste:{}", id);
-    let json: Option<String> = con.get(&key).await?;
-
-    match json {
-        Some(j) => {
-            let paste: Paste = serde_json::from_str(&j)?;
-            Ok(Json(PasteMetadata {
-                exists: true,
-                has_password: paste.has_password,
-                burn_after_read: paste.burn_after_read,
-                created_at: paste.created_at,
-                expires_at: paste.expires_at,
-            }))
-        }
+    match paste {
+        Some(paste) => Ok(Json(PasteMetadata {
+            exists: true,
+            has_password: paste.has_password,
+            burn_after_read: paste.burn_after_read,
+            created_at: paste.created_at,
+            expires_at: paste.expires_at,
+        })),
         None => Ok(Json(PasteMetadata {
             exists: false,
             has_password: false,
@@ -138,25 +127,7 @@ async fn verify_proof_of_work(state: &AppState, headers: &HeaderMap) -> Result<(
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| AppError::BadRequest("Missing X-PoW-Signature header".to_string()))?;
 
-    let mut con = state
-        .pool
-        .get()
-        .await
-        .map_err(|_| AppError::InternalServerError)?;
-    let salt_key = format!("pow:salt:{}", pow_salt);
-
-    // Atomic check and set to prevent race conditions (TOCTOU)
-    let set_result: Option<String> = deadpool_redis::redis::cmd("SET")
-        .arg(&salt_key)
-        .arg("used")
-        .arg("NX")
-        .arg("EX")
-        .arg(120)
-        .query_async(&mut con)
-        .await
-        .map_err(|_| AppError::InternalServerError)?;
-
-    if set_result.is_none() {
+    if !state.repository.mark_salt_used(pow_salt).await? {
         return Err(AppError::Unauthorized("PoW salt already used".to_string()));
     }
 
@@ -208,38 +179,7 @@ pub async fn create_paste(
 ) -> Result<(StatusCode, Json<CreatePasteResponse>), AppError> {
     verify_proof_of_work(&state, &headers).await?;
 
-    // validating ciphertext isn't empty
-    if req.data.is_empty() {
-        return Err(AppError::BadRequest("Data cannot be empty".to_string()));
-    }
-
-    if req.iv.len() > 512 {
-        return Err(AppError::BadRequest("IV too long".to_string()));
-    }
-
-    if let Some(ref salt) = req.salt {
-        if salt.len() > 512 {
-            return Err(AppError::BadRequest("Salt too long".to_string()));
-        }
-    }
-
-    if let Some(ref key) = req.encrypted_key {
-        if key.len() > 512 {
-            return Err(AppError::BadRequest("Encrypted key too long".to_string()));
-        }
-    }
-
-    if let Some(ref iv) = req.key_iv {
-        if iv.len() > 512 {
-            return Err(AppError::BadRequest("Key IV too long".to_string()));
-        }
-    }
-
-    let mut con = state
-        .pool
-        .get()
-        .await
-        .map_err(|_| AppError::InternalServerError)?;
+    req.validate().map_err(AppError::BadRequest)?;
 
     let id = Uuid::new_v4().to_string();
 
@@ -257,9 +197,6 @@ pub async fn create_paste(
         key_iv: req.key_iv,
         burn_token_hash: req.burn_token_hash,
     };
-
-    let key = format!("paste:{}", paste.id);
-    let json = serde_json::to_string(&paste)?;
 
     // Calculate TTL
     let ttl_seconds = if let Some(expires_at) = paste.expires_at {
@@ -291,19 +228,7 @@ pub async fn create_paste(
         final_ttl = MAX_TTL;
     }
 
-    let result: Option<String> = deadpool_redis::redis::cmd("SET")
-        .arg(&key)
-        .arg(json)
-        .arg("NX")
-        .arg("EX")
-        .arg(final_ttl)
-        .query_async(&mut con)
-        .await?;
-
-    if result.is_none() {
-        // Key already exists (collision or malicious overwrite attempt)
-        return Err(AppError::Conflict("Paste ID already exists".to_string()));
-    }
+    state.repository.save_paste(paste, final_ttl).await?;
 
     Ok((StatusCode::CREATED, Json(CreatePasteResponse { id })))
 }
@@ -317,39 +242,18 @@ pub async fn get_paste(
         .try_acquire()
         .map_err(|_| AppError::TooManyRequests)?;
 
-    let mut con = state
-        .pool
-        .get()
-        .await
-        .map_err(|_| AppError::InternalServerError)?;
-
-    let key = format!("paste:{}", id);
-
-    // Get paste
-    let json: Option<String> = con.get(&key).await?;
-    let json = json.ok_or(AppError::PasteNotFound)?;
-
-    let mut paste: Paste = serde_json::from_str(&json)?;
+    let paste = state.repository.get_paste(&id).await?;
+    let paste = paste.ok_or(AppError::PasteNotFound)?;
 
     if paste.burn_after_read && !paste.has_password {
         // set panic ttl (90s) burn burn burn away
-        let _: () = con.expire(&key, 90).await?;
+        state.repository.set_burn_timeout(&id, 90).await?;
+        Ok(Json(paste))
     } else {
         // Increment views
-        paste.views += 1;
-
-        let new_json = serde_json::to_string(&paste)?;
-
-        // Update in Redis using KEEPTTL to preserve expiration atomically
-        let _: () = deadpool_redis::redis::cmd("SET")
-            .arg(&key)
-            .arg(new_json)
-            .arg("KEEPTTL")
-            .query_async(&mut con)
-            .await?;
+        let updated_paste = state.repository.increment_views(paste).await?;
+        Ok(Json(updated_paste))
     }
-
-    Ok(Json(paste))
 }
 
 pub async fn delete_paste(
@@ -357,18 +261,8 @@ pub async fn delete_paste(
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Result<StatusCode, AppError> {
-    let mut con = state
-        .pool
-        .get()
-        .await
-        .map_err(|_| AppError::InternalServerError)?;
-
-    let key = format!("paste:{}", id);
-
-    // fetch metadata to check for burn token
-    let json: Option<String> = con.get(&key).await?;
-    let json = json.ok_or(AppError::PasteNotFound)?;
-    let paste: Paste = serde_json::from_str(&json)?;
+    let paste = state.repository.get_paste(&id).await?;
+    let paste = paste.ok_or(AppError::PasteNotFound)?;
 
     if paste.burn_after_read {
         if let Some(stored_hash) = paste.burn_token_hash {
@@ -387,7 +281,7 @@ pub async fn delete_paste(
         }
     }
 
-    let _: () = con.del(&key).await?;
+    state.repository.delete_paste(&id).await?;
 
     Ok(StatusCode::NO_CONTENT)
 }
