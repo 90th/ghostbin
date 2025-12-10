@@ -14,6 +14,13 @@ export const LANGUAGE_OPTIONS = [
     { label: 'C/C++', value: 'c' },
 ] as const;
 
+export const EXPIRATION_OPTIONS = [
+  { label: '1 Hour', value: 60 * 60 * 1000 },
+  { label: '1 Day', value: 24 * 60 * 60 * 1000 },
+  { label: '1 Week', value: 7 * 24 * 60 * 60 * 1000 },
+  { label: 'Never', value: 0 },
+];
+
 const VALID_LANGUAGES = new Set(LANGUAGE_OPTIONS.map(opt => opt.value));
 
 export function isValidLanguage(lang: string): boolean {
