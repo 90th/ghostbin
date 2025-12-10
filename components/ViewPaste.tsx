@@ -150,13 +150,17 @@ export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, on
     setErrorMsg('');
 
     try {
-      // fetch full paste only after password is provided
-      const encryptedData = await StorageService.getPaste(pasteId);
+      let encryptedData = pasteData;
+
       if (!encryptedData) {
-        throw new Error("Paste not found, expired, or burned.");
+        // fetch full paste only after password is provided
+        encryptedData = await StorageService.getPaste(pasteId);
+        if (!encryptedData) {
+          throw new Error("Paste not found, expired, or burned.");
+        }
+        setPasteData(encryptedData);
       }
 
-      setPasteData(encryptedData);
       decryptContent(encryptedData, passwordInput, true);
     } catch (err: any) {
       setStatus('password_required');
