@@ -1,24 +1,13 @@
-mod db;
-mod error;
-mod handlers;
-mod model;
-mod repository;
-
-use axum::{
-    extract::DefaultBodyLimit,
-    http::Method,
-    routing::{get, post},
-    Router,
-};
 use dotenvy::dotenv;
-use handlers::AppState;
+use ghostbin_server::{
+    app, db,
+    handlers::AppState,
+    repository::PasteRepository,
+};
 use rand::Rng;
-use repository::PasteRepository;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
-use tower_http::cors::{Any, CorsLayer};
-use tower_http::trace::TraceLayer;
 
 const MAX_CONCURRENT_READS: usize = 50;
 const MAX_CONCURRENT_CHALLENGES: usize = 100;
@@ -44,33 +33,7 @@ async fn main() {
         challenge_limiter,
     };
 
-    let frontend_url =
-        std::env::var("FRONTEND_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-
-    let cors = CorsLayer::new()
-        .allow_origin(
-            frontend_url
-                .parse::<axum::http::HeaderValue>()
-                .expect("Invalid FRONTEND_URL header value"),
-        )
-        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
-        .allow_headers(Any);
-
-    let app = Router::new()
-        .route("/api/v1/challenge", get(handlers::get_challenge))
-        .route("/api/v1/paste", post(handlers::create_paste))
-        .route(
-            "/api/v1/paste/:id",
-            get(handlers::get_paste).delete(handlers::delete_paste),
-        )
-        .route(
-            "/api/v1/paste/:id/metadata",
-            get(handlers::get_paste_metadata),
-        )
-        .layer(DefaultBodyLimit::max(1024 * 1024 + 512 * 1024)) // 1.5MB limit
-        .layer(cors)
-        .layer(TraceLayer::new_for_http())
-        .with_state(state);
+    let app = app(state);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     println!("Listening on {}", addr);

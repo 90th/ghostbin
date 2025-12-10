@@ -17,7 +17,7 @@ pub struct Paste {
     pub burn_token_hash: Option<String>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CreatePasteRequest {
     pub iv: String,
@@ -33,7 +33,7 @@ pub struct CreatePasteRequest {
     pub burn_token_hash: Option<String>,
 }
 
-#[derive(Serialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreatePasteResponse {
     pub id: String,
 }
@@ -67,5 +67,80 @@ impl CreatePasteRequest {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_validate_empty_data() {
+        let req = CreatePasteRequest {
+            iv: "iv".to_string(),
+            data: "".to_string(),
+            created_at: 0,
+            expires_at: None,
+            burn_after_read: false,
+            views: 0,
+            has_password: false,
+            salt: None,
+            encrypted_key: None,
+            key_iv: None,
+            burn_token_hash: None,
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_long_fields() {
+        let long_string = "a".repeat(513);
+        let req = CreatePasteRequest {
+            iv: long_string.clone(),
+            data: "data".to_string(),
+            created_at: 0,
+            expires_at: None,
+            burn_after_read: false,
+            views: 0,
+            has_password: false,
+            salt: None,
+            encrypted_key: None,
+            key_iv: None,
+            burn_token_hash: None,
+        };
+        assert!(req.validate().is_err());
+
+        let req = CreatePasteRequest {
+            iv: "iv".to_string(),
+            data: "data".to_string(),
+            created_at: 0,
+            expires_at: None,
+            burn_after_read: false,
+            views: 0,
+            has_password: false,
+            salt: Some(long_string.clone()),
+            encrypted_key: None,
+            key_iv: None,
+            burn_token_hash: None,
+        };
+        assert!(req.validate().is_err());
+    }
+
+    #[test]
+    fn test_validate_valid_payload() {
+        let req = CreatePasteRequest {
+            iv: "iv".to_string(),
+            data: "data".to_string(),
+            created_at: 0,
+            expires_at: None,
+            burn_after_read: false,
+            views: 0,
+            has_password: false,
+            salt: None,
+            encrypted_key: None,
+            key_iv: None,
+            burn_token_hash: None,
+        };
+        assert!(req.validate().is_ok());
     }
 }

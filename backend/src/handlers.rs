@@ -9,7 +9,7 @@ use axum::{
 use constant_time_eq::constant_time_eq;
 use hmac::{Hmac, Mac};
 use rand::Rng;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -24,7 +24,7 @@ pub struct AppState {
     pub challenge_limiter: Arc<Semaphore>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ChallengeResponse {
     pub salt: String,
     pub difficulty: usize,
