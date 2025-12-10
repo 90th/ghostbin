@@ -1,9 +1,5 @@
 use dotenvy::dotenv;
-use ghostbin_server::{
-    app, db,
-    handlers::AppState,
-    repository::PasteRepository,
-};
+use ghostbin_server::{app, db, handlers::AppState, repository::PasteRepository};
 use rand::Rng;
 use std::net::SocketAddr;
 use std::sync::Arc;
