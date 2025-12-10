@@ -48,11 +48,15 @@ impl PasteRepository {
             .map_err(|_| AppError::InternalServerError)?;
 
         let key = format!("paste:{}", id);
-        let json: Option<String> = con.get(&key).await.map_err(|_| AppError::InternalServerError)?;
+        let json: Option<String> = con
+            .get(&key)
+            .await
+            .map_err(|_| AppError::InternalServerError)?;
 
         match json {
             Some(j) => {
-                let paste: Paste = serde_json::from_str(&j).map_err(|_| AppError::InternalServerError)?;
+                let paste: Paste =
+                    serde_json::from_str(&j).map_err(|_| AppError::InternalServerError)?;
                 Ok(Some(paste))
             }
             None => Ok(None),
@@ -90,7 +94,10 @@ impl PasteRepository {
             .map_err(|_| AppError::InternalServerError)?;
 
         let key = format!("paste:{}", id);
-        let _: () = con.expire(&key, seconds as i64).await.map_err(|_| AppError::InternalServerError)?;
+        let _: () = con
+            .expire(&key, seconds as i64)
+            .await
+            .map_err(|_| AppError::InternalServerError)?;
         Ok(())
     }
 
@@ -102,7 +109,10 @@ impl PasteRepository {
             .map_err(|_| AppError::InternalServerError)?;
 
         let key = format!("paste:{}", id);
-        let _: () = con.del(&key).await.map_err(|_| AppError::InternalServerError)?;
+        let _: () = con
+            .del(&key)
+            .await
+            .map_err(|_| AppError::InternalServerError)?;
         Ok(())
     }
 
