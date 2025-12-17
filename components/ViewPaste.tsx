@@ -1,4 +1,4 @@
-import React from 'react';
+import { Component, Switch, Match } from 'solid-js';
 import { usePasteViewer } from '../hooks/usePasteViewer';
 import { PasswordRequest } from './ViewPaste/PasswordRequest';
 import { PasteContent } from './ViewPaste/PasteContent';
@@ -11,31 +11,31 @@ interface ViewPasteProps {
   onFork: (content: string, language: string) => void;
 }
 
-export const ViewPaste: React.FC<ViewPasteProps> = ({ pasteId, decryptionKey, onBack, onFork }) => {
-  const { status, decryptedPaste, errorMsg, submitPassword } = usePasteViewer(pasteId, decryptionKey);
+export const ViewPaste: Component<ViewPasteProps> = (props) => {
+  const { status, decryptedPaste, errorMsg, submitPassword } = usePasteViewer(
+    () => props.pasteId,
+    () => props.decryptionKey
+  );
 
-  if (status === 'loading' || status === 'decrypting') {
-    return <LoadingView status={status} />;
-  }
-
-  if (status === 'password_required') {
-    return (
-      <PasswordRequest
-        onSubmit={submitPassword}
-        pasteId={pasteId}
-        errorMsg={errorMsg}
-        onBack={onBack}
-      />
-    );
-  }
-
-  if (status === 'error') {
-    return <ErrorView errorMsg={errorMsg} onBack={onBack} />;
-  }
-
-  if (status === 'success' && decryptedPaste) {
-    return <PasteContent decryptedPaste={decryptedPaste} onFork={onFork} />;
-  }
-
-  return null;
+  return (
+    <Switch>
+      <Match when={status() === 'loading' || status() === 'decrypting'}>
+        <LoadingView status={status() as 'loading' | 'decrypting'} />
+      </Match>
+      <Match when={status() === 'password_required'}>
+        <PasswordRequest
+          onSubmit={submitPassword}
+          pasteId={props.pasteId}
+          errorMsg={errorMsg()}
+          onBack={props.onBack}
+        />
+      </Match>
+      <Match when={status() === 'error'}>
+        <ErrorView errorMsg={errorMsg()} onBack={props.onBack} />
+      </Match>
+      <Match when={status() === 'success' && decryptedPaste()}>
+        <PasteContent decryptedPaste={decryptedPaste()!} onFork={props.onFork} />
+      </Match>
+    </Switch>
+  );
 };

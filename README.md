@@ -20,7 +20,7 @@ if the server restarts, the power cuts, or the process is killed, the data is in
 - **tor support:** ships with a built-in tor hidden service configuration.
 
 ## stack
-- **frontend:** react + vite + typescript (bun)
+- **frontend:** solidjs + vite + typescript (bun)
 - **backend:** rust (axum + tokio)
 - **database:** redis (in-memory only)
 
