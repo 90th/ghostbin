@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { createSignal } from 'solid-js';
 import { v4 as uuidv4 } from 'uuid';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
@@ -12,18 +12,19 @@ interface UsePasteCreationProps {
     } | null;
 }
 
-export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) => {
-    const [content, setContent] = useState(initialData?.content || '');
-    const [password, setPassword] = useState('');
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [burnAfterRead, setBurnAfterRead] = useState(false);
-    const [expiration, setExpiration] = useState<number>(24 * 60 * 60 * 1000); // Default 1 Day
-    const [language, setLanguage] = useState<string>(initialData?.language || 'plaintext');
-    const [shareUrl, setShareUrl] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [showPassword, setShowPassword] = useState(false);
+export const usePasteCreation = (props: UsePasteCreationProps = {}) => {
+    const safeProps = props || {};
+    const [content, setContent] = createSignal(safeProps.initialData?.content || '');
+    const [password, setPassword] = createSignal('');
+    const [isProcessing, setIsProcessing] = createSignal(false);
+    const [burnAfterRead, setBurnAfterRead] = createSignal(false);
+    const [expiration, setExpiration] = createSignal<number>(24 * 60 * 60 * 1000); // Default 1 Day
+    const [language, setLanguage] = createSignal<string>(safeProps.initialData?.language || 'plaintext');
+    const [shareUrl, setShareUrl] = createSignal<string | null>(null);
+    const [error, setError] = createSignal<string | null>(null);
+    const [showPassword, setShowPassword] = createSignal(false);
 
-    const handleGeneratePassword = useCallback(() => {
+    const handleGeneratePassword = () => {
         const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
         const length = 17;
         const randomValues = new Uint32Array(length);
@@ -35,9 +36,9 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
         }
         setPassword(newPassword);
         setShowPassword(true);
-    }, []);
+    };
 
-    const handleReset = useCallback(() => {
+    const handleReset = () => {
         setShareUrl(null);
         setContent('');
         setPassword('');
@@ -46,10 +47,10 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
         setLanguage('plaintext');
         setError(null);
         setShowPassword(false);
-    }, []);
+    };
 
-    const handleEncrypt = useCallback(async () => {
-        if (!content.trim()) return;
+    const handleEncrypt = async () => {
+        if (!content().trim()) return;
 
         setIsProcessing(true);
         setError(null);
@@ -87,21 +88,21 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
             // 1b. Generate Burn Token if needed
             let burnToken: string | undefined;
             let burnTokenHash: string | undefined;
-            if (burnAfterRead) {
+            if (burnAfterRead()) {
                 burnToken = uuidv4();
                 burnTokenHash = await CryptoService.hashToken(burnToken);
             }
 
             // 2. Encrypt Content (pack language inside to prevent metadata leakage)
             const payloadToEncrypt = JSON.stringify({
-                text: content,
-                language,
+                text: content(),
+                language: language(),
                 burnToken
             });
             const { iv: contentIv, data: encryptedContent } = await CryptoService.encryptText(payloadToEncrypt, contentKey);
 
             // 3. Calculate Expiration
-            const expiresAt = expiration > 0 ? Date.now() + expiration : undefined;
+            const expiresAt = expiration() > 0 ? Date.now() + expiration() : undefined;
 
             // 4. Prepare payload (language is now inside ciphertext, not exposed to server)
             let payload: CreatePastePayload = {
@@ -109,7 +110,7 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
                 data: encryptedContent,
                 createdAt: Date.now(),
                 expiresAt,
-                burnAfterRead,
+                burnAfterRead: burnAfterRead(),
                 views: 0,
                 hasPassword: false,
                 burnTokenHash
@@ -117,9 +118,9 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
 
             let keyParam = '';
 
-            if (password.trim()) {
+            if (password().trim()) {
                 const salt = CryptoService.generateSalt();
-                const wrapperKey = await CryptoService.deriveKeyFromPassword(password, salt);
+                const wrapperKey = await CryptoService.deriveKeyFromPassword(password(), salt);
                 const contentKeyString = await CryptoService.exportKey(contentKey);
                 const { iv: keyIv, data: encryptedKeyData } = await CryptoService.encryptText(contentKeyString, wrapperKey);
 
@@ -152,7 +153,7 @@ export const usePasteCreation = ({ initialData }: UsePasteCreationProps = {}) =>
         } finally {
             setIsProcessing(false);
         }
-    }, [content, burnAfterRead, expiration, language, password]);
+    };
 
     return {
         content, setContent,

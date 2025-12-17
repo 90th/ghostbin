@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { createSignal, createEffect } from 'solid-js';
 import * as CryptoService from '../services/cryptoService';
 import * as StorageService from '../services/storageService';
 import { base64ToArrayBuffer } from '../lib/encoding';
@@ -7,13 +7,13 @@ import { isValidLanguage } from '../lib/constants';
 
 export type ViewerStatus = 'loading' | 'error' | 'password_required' | 'decrypting' | 'success';
 
-export const usePasteViewer = (pasteId: string, decryptionKey: string | null) => {
-  const [status, setStatus] = useState<ViewerStatus>('loading');
-  const [pasteData, setPasteData] = useState<EncryptedPaste | null>(null);
-  const [decryptedPaste, setDecryptedPaste] = useState<DecryptedPaste | null>(null);
-  const [errorMsg, setErrorMsg] = useState('');
+export const usePasteViewer = (pasteId: () => string, decryptionKey: () => string | null) => {
+  const [status, setStatus] = createSignal<ViewerStatus>('loading');
+  const [pasteData, setPasteData] = createSignal<EncryptedPaste | null>(null);
+  const [decryptedPaste, setDecryptedPaste] = createSignal<DecryptedPaste | null>(null);
+  const [errorMsg, setErrorMsg] = createSignal('');
 
-  const decryptContent = useCallback(async (data: EncryptedPaste, keyString: string, isPasswordDerived = false) => {
+  const decryptContent = async (data: EncryptedPaste, keyString: string, isPasswordDerived = false) => {
     setStatus('decrypting');
     try {
       let contentKey: CryptoKey;
@@ -78,13 +78,16 @@ export const usePasteViewer = (pasteId: string, decryptionKey: string | null) =>
         setErrorMsg("Decryption failed. Key invalid.");
       }
     }
-  }, []);
+  };
 
-  useEffect(() => {
+  createEffect(() => {
+    const currentPasteId = pasteId();
+    const currentKey = decryptionKey();
+
     const fetchPaste = async () => {
       try {
         // fetch metadata first to check if password is required without downloading full payload
-        const metadata = await StorageService.getPasteMetadata(pasteId);
+        const metadata = await StorageService.getPasteMetadata(currentPasteId);
         if (!metadata || !metadata.exists) {
           throw new Error("Paste not found, expired, or burned.");
         }
@@ -96,17 +99,17 @@ export const usePasteViewer = (pasteId: string, decryptionKey: string | null) =>
         }
 
         // no password needed, fetch full paste and decrypt
-        if (!decryptionKey) {
+        if (!currentKey) {
           throw new Error("Decryption key missing.");
         }
 
-        const encryptedData = await StorageService.getPaste(pasteId);
+        const encryptedData = await StorageService.getPaste(currentPasteId);
         if (!encryptedData) {
           throw new Error("Paste not found, expired, or burned.");
         }
 
         setPasteData(encryptedData);
-        decryptContent(encryptedData, decryptionKey);
+        decryptContent(encryptedData, currentKey);
 
       } catch (err: any) {
         console.error(err);
@@ -116,18 +119,18 @@ export const usePasteViewer = (pasteId: string, decryptionKey: string | null) =>
     };
 
     fetchPaste();
-  }, [pasteId, decryptionKey, decryptContent]);
+  });
 
   const submitPassword = async (password: string) => {
     setStatus('loading');
     setErrorMsg('');
 
     try {
-      let encryptedData = pasteData;
+      let encryptedData = pasteData();
 
       if (!encryptedData) {
         // fetch full paste only after password is provided
-        encryptedData = await StorageService.getPaste(pasteId);
+        encryptedData = await StorageService.getPaste(pasteId());
         if (!encryptedData) {
           throw new Error("Paste not found, expired, or burned.");
         }
