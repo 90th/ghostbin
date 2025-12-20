@@ -11,13 +11,15 @@
     ],
     "skipLibCheck": true,
     "types": [
+      "vite/client",
       "node"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
-    "jsx": "react-jsx",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "paths": {
       "@/*": [
         "./*"
